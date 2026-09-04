@@ -6,7 +6,10 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+// 이미지 전송을 위해 대용량(10MB) 데이터 수신 허용 설정 추가
+const io = new Server(server, {
+    maxHttpBufferSize: 10 * 1024 * 1024 
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -61,11 +64,17 @@ app.post('/api/login', async (req, res) => {
 });
 
 let onlineUsers = {};
+let typingUsers = {}; // 입력 중인 유저들을 관리하는 객체
 
 io.on('connection', (socket) => {
     const username = socket.handshake.query.username;
 
     if (username) {
+        for (let id in onlineUsers) {
+            if (onlineUsers[id] === username) {
+                delete onlineUsers[id];
+            }
+        }
         onlineUsers[socket.id] = username;
         io.emit('update_user_list', Object.values(onlineUsers));
     }
@@ -78,7 +87,9 @@ io.on('connection', (socket) => {
         const messageData = {
             username: data.username,
             message: data.message,
-            time: data.time
+            time: data.time,
+            image: data.image || null,     // 이미지 데이터 추가
+            replyTo: data.replyTo || null  // 답장 정보 추가
         };
         
         try {
@@ -89,10 +100,26 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 입력 중 상태 처리
+    socket.on('typing', (isTyping) => {
+        if (username) {
+            if (isTyping) {
+                typingUsers[socket.id] = username;
+            } else {
+                delete typingUsers[socket.id];
+            }
+            io.emit('update_typing', Object.values(typingUsers));
+        }
+    });
+
     socket.on('disconnect', () => {
         if (onlineUsers[socket.id]) {
             delete onlineUsers[socket.id];
             io.emit('update_user_list', Object.values(onlineUsers));
+        }
+        if (typingUsers[socket.id]) {
+            delete typingUsers[socket.id];
+            io.emit('update_typing', Object.values(typingUsers));
         }
     });
 });
