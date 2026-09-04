@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb'); // ObjectId 추가
 const path = require('path');
 
 const app = express();
@@ -88,13 +88,29 @@ io.on('connection', (socket) => {
             username: data.username,
             message: data.message,
             time: data.time,
-            image: data.image || null,     // 이미지 데이터 추가
+            image: data.image || null,      // 이미지 데이터 추가
             replyTo: data.replyTo || null  // 답장 정보 추가
         };
         
         try {
-            await db.collection('messages').insertOne(messageData);
+            const result = await db.collection('messages').insertOne(messageData);
+            // 클라이언트에서 삭제 시 _id를 사용하기 위해 생성된 _id를 포함하여 전달
+            messageData._id = result.insertedId;
             io.emit('receive_message', messageData);
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    // 메시지 삭제 처리
+    socket.on('delete_message', async (messageId) => {
+        try {
+            const id = new ObjectId(messageId);
+            const msg = await db.collection('messages').findOne({ _id: id });
+            if (msg && msg.username === username) {
+                await db.collection('messages').deleteOne({ _id: id });
+                io.emit('message_deleted', messageId);
+            }
         } catch (err) {
             console.error(err);
         }
