@@ -231,7 +231,6 @@
 
             socket.on('load_history', (history) => {
                 const chatMessages = document.getElementById('chat-messages');
-                // 배너는 남기고 메시지들만 초기화하기 위해 배너 외의 기존 메시지 요소들 제거
                 const banner = document.getElementById('new-message-banner');
                 chatMessages.innerHTML = '';
                 chatMessages.appendChild(banner);
@@ -309,11 +308,10 @@
 
         function handleScroll() {
             const chatMessages = document.getElementById('chat-messages');
-            // 위로 스크롤을 많이 올렸는지 확인 (바닥에서 100px 이상 떨어져 있으면 스크롤한 상태로 간주)
-            const isScrolledUp = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight > 100;
+            // 바닥에서 30px 이상 위로 올라가 있으면 스크롤한 상태로 판정
+            const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
             
-            if (!isScrolledUp) {
-                // 바닥에 도달하면 알림 배너 숨김
+            if (distanceToBottom <= 30) {
                 document.getElementById('new-message-banner').style.display = 'none';
             }
         }
@@ -420,7 +418,10 @@
 
         function appendMessage(data, isNewMessage) {
             const chatMessages = document.getElementById('chat-messages');
-            const isScrolledUp = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight > 100;
+            
+            // 현재 스크롤이 바닥에서 30px 이상 떨어져 있는지 확인
+            const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+            const isScrolledUp = distanceToBottom > 30;
             const isMine = data.username === myUsername;
 
             const box = document.createElement('div');
@@ -469,13 +470,11 @@
 
             chatMessages.appendChild(box);
 
-            // 스크롤 처리에 따른 배너 및 자동 스크롤 로직
+            // 스크롤 및 배너 처리
             if (!isNewMessage || !isScrolledUp) {
-                // 맨 아래에 있거나 초기 로딩일 때는 그냥 쭉 내려줌
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 document.getElementById('new-message-banner').style.display = 'none';
             } else {
-                // 사용자가 위로 스크롤을 올린 상태에서 새 메시지가 온 경우 배너 띄우기
                 const bannerText = document.getElementById('banner-text');
                 const contentSummary = data.message ? data.message : '[사진]';
                 bannerText.innerText = `${data.username}: ${contentSummary}`;
