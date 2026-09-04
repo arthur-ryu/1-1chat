@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { MongoClient, ObjectId } = require('mongodb'); // ObjectId 추가
+const { MongoClient, ObjectId } = require('mongodb');
 const path = require('path');
 
 const app = express();
@@ -94,7 +94,6 @@ io.on('connection', (socket) => {
         
         try {
             const result = await db.collection('messages').insertOne(messageData);
-            // 클라이언트에서 삭제 시 _id를 사용하기 위해 생성된 _id를 포함하여 전달
             messageData._id = result.insertedId;
             io.emit('receive_message', messageData);
         } catch (err) {
