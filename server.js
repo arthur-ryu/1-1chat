@@ -24,6 +24,14 @@ async function startServer() {
         db = client.db('chatapp');
         console.log('MongoDB 클라우드 데이터베이스 연결 성공!');
 
+        // ★ [추가된 부분] 3일(3일 * 24시간 * 60분 * 60초)이 지난 메시지 자동 삭제 TTL 인덱스 설정
+        // 기존에 메시지 컬렉션이 있다면 자동으로 인덱스가 적용됩니다.
+        await db.collection('messages').createIndex(
+            { "createdAt": 1 }, 
+            { expireAfterSeconds: 3 * 24 * 60 * 60 }
+        );
+        console.log('3일 지난 메시지 자동 삭제(TTL) 설정 완료!');
+
         const PORT = process.env.PORT || 3000;
         server.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
@@ -88,8 +96,9 @@ io.on('connection', (socket) => {
             username: data.username,
             message: data.message,
             time: data.time,
-            image: data.image || null,      // 이미지 데이터 추가
-            replyTo: data.replyTo || null  // 답장 정보 추가
+            image: data.image || null,      
+            replyTo: data.replyTo || null,  
+            createdAt: new Date() // ★ [추가된 부분] TTL 인덱스 기준이 될 현재 서버 시간 저장
         };
         
         try {
