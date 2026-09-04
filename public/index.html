@@ -146,7 +146,6 @@
             <div id="chat-menu-modal" onclick="if(event.target === this) closeChatMenu()">
                 <div class="chat-menu-content" id="chat-menu-box">
                     <button class="chat-menu-item" onclick="actionReply()">답장하기</button>
-                    <!-- 삭제 버튼은 동적으로 생성되거나 제어됨 -->
                 </div>
             </div>
         </div>
@@ -155,9 +154,9 @@
     <script>
         let socket;
         let myUsername = '';
-        let currentReply = null; // 답장 중인 메시지 정보
+        let currentReply = null; 
         let typingTimer;
-        let selectedMessageData = null; // 꾹 눌렀을 때 선택된 메시지 정보
+        let selectedMessageData = null; 
 
         async function signup() {
             const username = document.getElementById('username').value.trim();
@@ -211,11 +210,11 @@
             socket.on('load_history', (history) => {
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.innerHTML = '';
-                history.forEach(data => appendMessage(data, false)); // 히스토리 로드시 자동 스크롤 하단 이동
+                history.forEach(data => appendMessage(data, false));
             });
 
             socket.on('receive_message', (data) => {
-                appendMessage(data, true); // 새 메시지 수신 시 조건부 스크롤
+                appendMessage(data, true);
             });
 
             socket.on('message_deleted', (messageId) => {
@@ -235,7 +234,6 @@
                 });
             });
 
-            // 입력 중 상태 수신 처리
             socket.on('update_typing', (users) => {
                 const otherTyping = users.filter(u => u !== myUsername);
                 const noticeEl = document.getElementById('typing-notice');
@@ -263,12 +261,17 @@
         }
 
         function handleKeyDown(event) {
+            // 한글 조합 중(isComposing)일 때는 Enter 이벤트가 중복 트리거되므로 무시함 ('ㅇ'이 새 메시지로 튀는 현상 방지)
+            if (event.isComposing || event.keyCode === 229) {
+                return;
+            }
+
             if (event.key === 'Enter') {
                 if (event.shiftKey) {
-                    // Shift + Enter는 기본 줄바꿈 허용
+                    // Shift + Enter는 줄바꿈 허용
                     return;
                 } else {
-                    // 그냥 Enter는 전송
+                    // 일반 엔터 전송 처리
                     event.preventDefault();
                     sendMessage();
                 }
@@ -317,7 +320,6 @@
             cancelReply();
         }
 
-        // 이미지 전송 함수
         function sendImage(input) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
@@ -339,7 +341,7 @@
                         replyTo: currentReply
                     });
                     cancelReply();
-                    input.value = ''; // 초기화
+                    input.value = ''; 
                 };
                 reader.readAsDataURL(file);
             }
@@ -395,10 +397,7 @@
 
         function appendMessage(data, isNewMessage) {
             const chatMessages = document.getElementById('chat-messages');
-            
-            // 사용자가 위로 스크롤한 상태인지 확인
             const isScrolledUp = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight > 100;
-
             const isMine = data.username === myUsername;
 
             const box = document.createElement('div');
@@ -407,7 +406,6 @@
                 box.id = `msg-${data._id}`;
             }
 
-            // 꾹 누르기(contextmenu 또는 모바일 롱클릭) 이벤트로 답장/삭제 메뉴 연동
             box.oncontextmenu = (e) => {
                 e.preventDefault();
                 openChatMenu(data);
@@ -420,7 +418,6 @@
                 box.appendChild(nameDiv);
             }
 
-            // 답장 인용 영역 표시
             if (data.replyTo) {
                 const quoteDiv = document.createElement('div');
                 quoteDiv.className = 'reply-quote';
@@ -428,7 +425,6 @@
                 box.appendChild(quoteDiv);
             }
 
-            // 텍스트 메시지 버블
             if (data.message) {
                 const bubble = document.createElement('div');
                 bubble.className = 'bubble';
@@ -436,7 +432,6 @@
                 box.appendChild(bubble);
             }
 
-            // 이미지 메시지 표시
             if (data.image) {
                 const img = document.createElement('img');
                 img.src = data.image;
@@ -451,7 +446,6 @@
 
             chatMessages.appendChild(box);
 
-            // 스크롤 제어
             if (!isNewMessage || !isScrolledUp) {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 document.getElementById('scroll-down-btn').style.display = 'none';
