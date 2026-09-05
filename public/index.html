@@ -206,23 +206,18 @@
         let typingTimer;
         let selectedMessageData = null; 
         let currentOnlineUserSet = new Set();
+        let lastMarkedMessageId = null; // 중요: 중복 요청 방지용 변수
 
         function formatRelativeTime(timestamp, isOnline) {
             if (isOnline) return '현재 활동 중';
             if (!timestamp) return '활동 기록 없음';
             
             const diffSeconds = Math.floor((Date.now() - timestamp) / 1000);
-            if (diffSeconds < 60) {
-                return '방금전 활동';
-            }
+            if (diffSeconds < 60) return '방금전 활동';
             const diffMinutes = Math.floor(diffSeconds / 60);
-            if (diffMinutes < 60) {
-                return `${diffMinutes}분 전 활동`;
-            }
+            if (diffMinutes < 60) return `${diffMinutes}분 전 활동`;
             const diffHours = Math.floor(diffMinutes / 60);
-            if (diffHours < 24) {
-                return `${diffHours}시간 전 활동`;
-            }
+            if (diffHours < 24) return `${diffHours}시간 전 활동`;
             const diffDays = Math.floor(diffHours / 24);
             return `${diffDays}일 전 활동`;
         }
@@ -230,12 +225,10 @@
         async function signup() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
-            
             if(!username || !password) {
                 document.getElementById('auth-error').innerText = '닉네임과 비밀번호를 입력해주세요.';
                 return;
             }
-
             const res = await fetch('/api/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -248,19 +241,16 @@
         async function login() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
-            
             if(!username || !password) {
                 document.getElementById('auth-error').innerText = '닉네임과 비밀번호를 입력해주세요.';
                 return;
             }
-
             const res = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
             const data = await res.json();
-            
             if (data.success) {
                 myUsername = username;
                 document.getElementById('auth-screen').style.display = 'none';
@@ -284,7 +274,6 @@
                     appendMessage(data, false, isLast);
                 });
                 scrollToBottom();
-                checkAndMarkLastMessageRead();
             });
 
             socket.on('receive_message', (data) => {
@@ -295,7 +284,7 @@
                     if (oldReadEl) oldReadEl.remove();
                 }
                 appendMessage(data, true, true);
-                checkAndMarkLastMessageRead();
+                scrollToBottom();
             });
 
             socket.on('message_read_updated', ({ messageId, readBy }) => {
@@ -307,9 +296,7 @@
 
             socket.on('message_deleted', (messageId) => {
                 const msgEl = document.getElementById(`msg-${messageId}`);
-                if (msgEl) {
-                    msgEl.remove();
-                }
+                if (msgEl) msgEl.remove();
             });
 
             socket.on('update_user_list', ({ onlineList, allMembers }) => {
@@ -411,7 +398,11 @@
             if (distanceToBottom <= 30) {
                 const lastMsg = chatMessages.lastElementChild;
                 if (lastMsg && lastMsg.dataset.id) {
-                    socket.emit('mark_read', lastMsg.dataset.id);
+                    // ★ [중요] 이미 읽음 처리 보낸 마지막 메시지라면 중복 요청을 방지하여 서버 병목 차단
+                    if (lastMarkedMessageId !== lastMsg.dataset.id) {
+                        lastMarkedMessageId = lastMsg.dataset.id;
+                        socket.emit('mark_read', lastMsg.dataset.id);
+                    }
                 }
             }
         }
@@ -597,7 +588,6 @@
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 document.getElementById('new-message-banner').style.display = 'none';
                 document.getElementById('scroll-bottom-btn').style.display = 'none';
-                checkAndMarkLastMessageRead();
             } else {
                 const bannerText = document.getElementById('banner-text');
                 const contentSummary = data.message ? data.message : '[사진]';
