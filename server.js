@@ -23,10 +23,15 @@ async function startServer() {
         db = client.db('chatapp');
         console.log('MongoDB 클라우드 데이터베이스 연결 성공!');
 
+        try {
+            await db.collection('messages').dropIndex("createdAt_1");
+        } catch (e) {}
+
         await db.collection('messages').createIndex(
             { "createdAt": 1 }, 
             { expireAfterSeconds: 3 * 24 * 60 * 60 }
         );
+        console.log('3일 지난 메시지 자동 삭제(TTL) 설정 완료!');
 
         const PORT = process.env.PORT || 3000;
         server.listen(PORT, () => {
@@ -111,6 +116,9 @@ io.on('connection', async (socket) => {
             broadcastUserList();
         }
 
+        // 현재 온라인인 모든 유저를 초기 읽음 목록에 포함하여 누락 방지
+        const currentOnlineNames = Object.values(onlineUsers);
+
         const messageData = {
             username: data.username,
             message: data.message,
@@ -118,7 +126,7 @@ io.on('connection', async (socket) => {
             image: data.image || null,      
             replyTo: data.replyTo || null,  
             createdAt: new Date(),
-            readBy: [data.username] 
+            readBy: currentOnlineNames 
         };
         
         try {
@@ -140,8 +148,9 @@ io.on('connection', async (socket) => {
                 if (!msg.readBy.includes(username)) {
                     msg.readBy.push(username);
                     await db.collection('messages').updateOne({ _id: id }, { $set: { readBy: msg.readBy } });
-                    io.emit('message_read_updated', { messageId, readBy: msg.readBy });
                 }
+                // 읽음 상태 변경은 전체 메시지 중 가장 마지막 메시지인지와 관계없이 즉시 브로드캐스트
+                io.emit('message_read_updated', { messageId, readBy: msg.readBy });
             }
         } catch (err) {
             console.error(err);
