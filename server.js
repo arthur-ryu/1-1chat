@@ -116,9 +116,6 @@ io.on('connection', async (socket) => {
             broadcastUserList();
         }
 
-        // 현재 온라인인 모든 유저를 초기 읽음 목록에 포함하여 누락 방지
-        const currentOnlineNames = Object.values(onlineUsers);
-
         const messageData = {
             username: data.username,
             message: data.message,
@@ -126,7 +123,7 @@ io.on('connection', async (socket) => {
             image: data.image || null,      
             replyTo: data.replyTo || null,  
             createdAt: new Date(),
-            readBy: currentOnlineNames 
+            readBy: [data.username] // 새로 들어온 유저가 이전 메시지들을 전부 읽음 처리하지 않도록 보낸 사람만 초기 포함
         };
         
         try {
@@ -149,7 +146,6 @@ io.on('connection', async (socket) => {
                     msg.readBy.push(username);
                     await db.collection('messages').updateOne({ _id: id }, { $set: { readBy: msg.readBy } });
                 }
-                // 읽음 상태 변경은 전체 메시지 중 가장 마지막 메시지인지와 관계없이 즉시 브로드캐스트
                 io.emit('message_read_updated', { messageId, readBy: msg.readBy });
             }
         } catch (err) {
