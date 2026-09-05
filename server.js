@@ -6,7 +6,6 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-// 이미지 전송을 위해 대용량(10MB) 데이터 수신 허용 설정 추가
 const io = new Server(server, {
     maxHttpBufferSize: 10 * 1024 * 1024 
 });
@@ -24,13 +23,10 @@ async function startServer() {
         db = client.db('chatapp');
         console.log('MongoDB 클라우드 데이터베이스 연결 성공!');
 
-        // ★ [추가된 부분] 3일(3일 * 24시간 * 60분 * 60초)이 지난 메시지 자동 삭제 TTL 인덱스 설정
-        // 기존에 메시지 컬렉션이 있다면 자동으로 인덱스가 적용됩니다.
         await db.collection('messages').createIndex(
             { "createdAt": 1 }, 
             { expireAfterSeconds: 3 * 24 * 60 * 60 }
         );
-        console.log('3일 지난 메시지 자동 삭제(TTL) 설정 완료!');
 
         const PORT = process.env.PORT || 3000;
         server.listen(PORT, () => {
@@ -50,7 +46,7 @@ app.post('/api/signup', async (req, res) => {
         if (existingUser) {
             return res.json({ success: false, message: '이미 존재하는 닉네임입니다.' });
         }
-        await db.collection('users').insertOne({ username, password });
+        await db.collection('users').insertOne({ username, password, lastActive: Date.now() });
         res.json({ success: true, message: '회원가입 성공! 로그인해주세요.' });
     } catch (err) {
         res.status(500).json({ success: false, message: '서버 에러 발생' });
@@ -71,20 +67,20 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-let onlineUsers = {}; // socket.id -> username
-let userLastActive = {}; // username -> timestamp (마지막 활동 시간)
-let typingUsers = {}; // 입력 중인 유저들을 관리하는 객체
+let onlineUsers = {}; 
+let typingUsers = {}; 
 
-// 유저 목록과 각 유저의 마지막 활동 시간을 함께 브로드캐스트하는 함수
-function broadcastUserList() {
-    const userListData = Object.values(onlineUsers).map(username => ({
-        username: username,
-        lastActive: userLastActive[username] || Date.now()
-    }));
-    io.emit('update_user_list', userListData);
+async function updateAllMembersActivity() {
+    return await db.collection('users').find({}, { projection: { username: 1, lastActive: 1 } }).toArray();
 }
 
-io.on('connection', (socket) => {
+async function broadcastUserList() {
+    const onlineList = Object.values(onlineUsers);
+    const allMembers = await updateAllMembersActivity();
+    io.emit('update_user_list', { onlineList, allMembers });
+}
+
+io.on('connection', async (socket) => {
     const username = socket.handshake.query.username;
 
     if (username) {
@@ -94,7 +90,11 @@ io.on('connection', (socket) => {
             }
         }
         onlineUsers[socket.id] = username;
-        userLastActive[username] = Date.now(); // 접속 시 갱신
+        await db.collection('users').updateOne(
+            { username },
+            { $set: { lastActive: Date.now() } },
+            { upsert: true }
+        );
         broadcastUserList();
     }
 
@@ -104,7 +104,10 @@ io.on('connection', (socket) => {
 
     socket.on('send_message', async (data) => {
         if (username) {
-            userLastActive[username] = Date.now();
+            await db.collection('users').updateOne(
+                { username },
+                { $set: { lastActive: Date.now() } }
+            );
             broadcastUserList();
         }
 
@@ -114,8 +117,8 @@ io.on('connection', (socket) => {
             time: data.time,
             image: data.image || null,      
             replyTo: data.replyTo || null,  
-            createdAt: new Date(), // ★ [추가된 부분] TTL 인덱스 기준이 될 현재 서버 시간 저장
-            readBy: [data.username] // 보낸 사람은 기본적으로 읽음 처리
+            createdAt: new Date(),
+            readBy: [data.username] 
         };
         
         try {
@@ -127,7 +130,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 메시지 읽음 처리 이벤트
     socket.on('mark_read', async (messageId) => {
         if (!username) return;
         try {
@@ -146,7 +148,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 메시지 삭제 처리
     socket.on('delete_message', async (messageId) => {
         try {
             const id = new ObjectId(messageId);
@@ -160,10 +161,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 입력 중 상태 처리
-    socket.on('typing', (isTyping) => {
+    socket.on('typing', async (isTyping) => {
         if (username) {
-            userLastActive[username] = Date.now();
+            await db.collection('users').updateOne(
+                { username },
+                { $set: { lastActive: Date.now() } }
+            );
             if (isTyping) {
                 typingUsers[socket.id] = username;
             } else {
@@ -173,10 +176,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         if (onlineUsers[socket.id]) {
             const leftUser = onlineUsers[socket.id];
-            userLastActive[leftUser] = Date.now(); // 나간 시간 기록
+            await db.collection('users').updateOne(
+                { username: leftUser },
+                { $set: { lastActive: Date.now() } }
+            );
             delete onlineUsers[socket.id];
             broadcastUserList();
         }
