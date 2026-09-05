@@ -47,6 +47,11 @@
         .other .bubble { background-color: #fff; color: #000; border-top-left-radius: 2px; }
         
         .time { font-size: 9px; color: #777; margin-top: 2px; align-self: flex-end; }
+        
+        /* 읽음 표시 스타일 */
+        .read-status { font-size: 10px; color: #888; margin-top: 2px; }
+        .mine .read-status { align-self: flex-end; }
+        .other .read-status { align-self: flex-start; }
 
         /* 답장 인용 스타일 */
         .reply-quote { background: rgba(0,0,0,0.06); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #444; margin-bottom: 4px; border-left: 3px solid #3c1e1e; }
@@ -119,8 +124,10 @@
         .modal-content { background: #fff; width: 80%; max-width: 280px; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         .modal-content h3 { font-size: 16px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
         #online-users-list { list-style: none; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #444; }
-        #online-users-list li { padding: 6px 8px; background: #f9f9f9; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
-        #online-users-list li::before { content: "●"; color: #2ecc71; font-size: 10px; }
+        #online-users-list li { padding: 6px 8px; background: #f9f9f9; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .user-name-span { display: flex; align-items: center; gap: 6px; }
+        .user-name-span::before { content: "●"; color: #2ecc71; font-size: 10px; }
+        .user-time-span { font-size: 11px; color: #888; }
         .modal-close-btn { align-self: flex-end; padding: 6px 12px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
 
         /* 컨텍스트 메뉴 스타일 */
@@ -211,6 +218,24 @@
         let typingTimer;
         let selectedMessageData = null; 
 
+        // 상대적인 시간 포맷팅 함수
+        function formatRelativeTime(timestamp) {
+            const diffSeconds = Math.floor((Date.now() - timestamp) / 1000);
+            if (diffSeconds < 60) {
+                return '방금전 활동';
+            }
+            const diffMinutes = Math.floor(diffSeconds / 60);
+            if (diffMinutes < 60) {
+                return `${diffMinutes}분 전 활동`;
+            }
+            const diffHours = Math.floor(diffMinutes / 60);
+            if (diffHours < 24) {
+                return `${diffHours}시간 전 활동`;
+            }
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays}일 전 활동`;
+        }
+
         async function signup() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -263,12 +288,31 @@
             socket.on('load_history', (history) => {
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.innerHTML = '';
-                history.forEach(data => appendMessage(data, false));
+                history.forEach((data, index) => {
+                    const isLast = (index === history.length - 1);
+                    appendMessage(data, false, isLast);
+                });
                 scrollToBottom();
+                checkAndMarkLastMessageRead();
             });
 
             socket.on('receive_message', (data) => {
-                appendMessage(data, true);
+                // 새로운 메시지가 오면 기존 메시지들의 읽음 상태 표시를 갱신(없애거나 위치 이동)
+                const chatMessages = document.getElementById('chat-messages');
+                const lastMsg = chatMessages.lastElementChild;
+                if (lastMsg) {
+                    const oldReadEl = lastMsg.querySelector('.read-status');
+                    if (oldReadEl) oldReadEl.remove();
+                }
+                appendMessage(data, true, true);
+                checkAndMarkLastMessageRead();
+            });
+
+            socket.on('message_read_updated', ({ messageId, readBy }) => {
+                const msgEl = document.getElementById(`msg-${messageId}`);
+                if (msgEl) {
+                    updateReadStatusElement(msgEl, readBy);
+                }
             });
 
             socket.on('message_deleted', (messageId) => {
@@ -281,9 +325,19 @@
             socket.on('update_user_list', (users) => {
                 const listEl = document.getElementById('online-users-list');
                 listEl.innerHTML = '';
-                users.forEach(user => {
+                users.forEach(userObj => {
                     const li = document.createElement('li');
-                    li.innerText = user;
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'user-name-span';
+                    nameSpan.innerText = userObj.username;
+
+                    const timeSpan = document.createElement('span');
+                    timeSpan.className = 'user-time-span';
+                    timeSpan.innerText = formatRelativeTime(userObj.lastActive);
+
+                    li.appendChild(nameSpan);
+                    li.appendChild(timeSpan);
                     listEl.appendChild(li);
                 });
             });
@@ -334,6 +388,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
             document.getElementById('new-message-banner').style.display = 'none';
             document.getElementById('scroll-bottom-btn').style.display = 'none';
+            checkAndMarkLastMessageRead();
         }
 
         function handleScroll() {
@@ -346,6 +401,19 @@
             } else {
                 document.getElementById('new-message-banner').style.display = 'none';
                 document.getElementById('scroll-bottom-btn').style.display = 'none';
+                checkAndMarkLastMessageRead();
+            }
+        }
+
+        // 맨 아래로 스크롤되어 있거나 가장 최근 메시지를 보게 될 때 읽음 처리 전송
+        function checkAndMarkLastMessageRead() {
+            const chatMessages = document.getElementById('chat-messages');
+            const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+            if (distanceToBottom <= 30) {
+                const lastMsg = chatMessages.lastElementChild;
+                if (lastMsg && lastMsg.dataset.id) {
+                    socket.emit('mark_read', lastMsg.dataset.id);
+                }
             }
         }
 
@@ -449,7 +517,27 @@
             }
         }
 
-        function appendMessage(data, isNewMessage) {
+        function updateReadStatusElement(boxEl, readBy) {
+            let readEl = boxEl.querySelector('.read-status');
+            if (!readEl) {
+                readEl = document.createElement('div');
+                readEl.className = 'read-status';
+                boxEl.appendChild(readEl);
+            }
+
+            const othersWhoRead = (readBy || []).filter(u => u !== myUsername);
+            if (othersWhoRead.length === 0) {
+                readEl.innerText = '';
+            } else if (othersWhoRead.length === 1) {
+                readEl.innerText = `${othersWhoRead[0]} 읽음`;
+            } else if (othersWhoRead.length === 2) {
+                readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 읽음`;
+            } else {
+                readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 외 ${othersWhoRead.length - 2}명 읽음`;
+            }
+        }
+
+        function appendMessage(data, isNewMessage, isLastMessage = false) {
             const chatMessages = document.getElementById('chat-messages');
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
             const isScrolledUp = distanceToBottom > 30;
@@ -459,6 +547,7 @@
             box.className = `message-box ${isMine ? 'mine' : 'other'}`;
             if (data._id) {
                 box.id = `msg-${data._id}`;
+                box.dataset.id = data._id;
             }
 
             box.oncontextmenu = (e) => {
@@ -501,11 +590,16 @@
 
             chatMessages.appendChild(box);
 
+            if (isLastMessage) {
+                updateReadStatusElement(box, data.readBy);
+            }
+
             // 스크롤 및 배너/버튼 처리
             if (!isNewMessage || !isScrolledUp) {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 document.getElementById('new-message-banner').style.display = 'none';
                 document.getElementById('scroll-bottom-btn').style.display = 'none';
+                checkAndMarkLastMessageRead();
             } else {
                 const bannerText = document.getElementById('banner-text');
                 const contentSummary = data.message ? data.message : '[사진]';
