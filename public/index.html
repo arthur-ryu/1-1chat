@@ -14,7 +14,6 @@
             .container { height: 85vh; max-height: 750px; border-radius: 12px; overflow: hidden; }
         }
         
-        /* 인증 화면 */
         #auth-screen { padding: 30px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; background: #fee500; }
         #auth-screen h2 { margin-bottom: 20px; color: #3c1e1e; }
         .input-group { width: 100%; max-width: 320px; margin-bottom: 10px; }
@@ -25,7 +24,6 @@
         .btn-signup { background-color: #fff; color: #3c1e1e; }
         .error-msg { color: #d9534f; margin-top: 10px; font-size: 13px; text-align: center; }
 
-        /* 채팅 화면 */
         #chat-screen { display: none; flex-direction: column; height: 100%; position: relative; }
         .chat-header { background-color: #1f1f1f; color: #fff; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         
@@ -107,7 +105,6 @@
         }
         #scroll-bottom-btn:hover { background: #f0f0f0; }
 
-        /* 모달 창 디자인 */
         #user-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 20; }
         .modal-content { background: #fff; width: 85%; max-width: 300px; height: 75%; max-height: 400px; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         .modal-scroll-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
@@ -208,9 +205,13 @@
         let currentReply = null; 
         let typingTimer;
         let selectedMessageData = null; 
+        let currentOnlineUserSet = new Set(); // 현재 접속 중인 유저 목록 추적
 
-        function formatRelativeTime(timestamp) {
+        // 현재 접속 중인 유저는 "현재 활동 중"으로 표시
+        function formatRelativeTime(timestamp, isOnline) {
+            if (isOnline) return '현재 활동 중';
             if (!timestamp) return '활동 기록 없음';
+            
             const diffSeconds = Math.floor((Date.now() - timestamp) / 1000);
             if (diffSeconds < 60) {
                 return '방금전 활동';
@@ -289,6 +290,7 @@
 
             socket.on('receive_message', (data) => {
                 const chatMessages = document.getElementById('chat-messages');
+                // 기존 마지막 메시지에서 읽음 상태 제거 후 새로운 메시지를 마지막에 추가
                 const lastMsg = chatMessages.lastElementChild;
                 if (lastMsg) {
                     const oldReadEl = lastMsg.querySelector('.read-status');
@@ -313,6 +315,8 @@
             });
 
             socket.on('update_user_list', ({ onlineList, allMembers }) => {
+                currentOnlineUserSet = new Set(onlineList);
+
                 // 1. 온라인 유저 렌더링
                 const onlineUl = document.getElementById('online-users-list');
                 onlineUl.innerHTML = '';
@@ -325,21 +329,21 @@
                     onlineUl.appendChild(li);
                 });
 
-                // 2. 멤버 목록 렌더링 (스크롤 영역)
+                // 2. 멤버 목록 렌더링
                 const membersUl = document.getElementById('all-members-list');
                 membersUl.innerHTML = '';
                 allMembers.forEach(member => {
                     const li = document.createElement('li');
+                    const isOnline = currentOnlineUserSet.has(member.username);
                     
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'user-name-span';
-                    // 온라인 상태라면 초록불, 아니면 회색불 표시
-                    nameSpan.classList.add(onlineList.includes(member.username) ? 'online-dot' : 'offline-dot');
+                    nameSpan.classList.add(isOnline ? 'online-dot' : 'offline-dot');
                     nameSpan.innerText = member.username;
 
                     const timeSpan = document.createElement('span');
                     timeSpan.className = 'user-time-span';
-                    timeSpan.innerText = formatRelativeTime(member.lastActive);
+                    timeSpan.innerText = formatRelativeTime(member.lastActive, isOnline);
 
                     li.appendChild(nameSpan);
                     li.appendChild(timeSpan);
@@ -408,6 +412,7 @@
         function checkAndMarkLastMessageRead() {
             const chatMessages = document.getElementById('chat-messages');
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+            // 채팅방 하단에 위치해 있으면 항상 가장 마지막 메시지 ID를 읽음 처리 서버로 전송
             if (distanceToBottom <= 30) {
                 const lastMsg = chatMessages.lastElementChild;
                 if (lastMsg && lastMsg.dataset.id) {
@@ -524,6 +529,7 @@
                 boxEl.appendChild(readEl);
             }
 
+            // 본인을 제외하고 메시지를 읽은 다른 유저 목록 필터링
             const othersWhoRead = (readBy || []).filter(u => u !== myUsername);
             if (othersWhoRead.length === 0) {
                 readEl.innerText = '';
