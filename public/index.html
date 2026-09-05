@@ -206,7 +206,7 @@
         let typingTimer;
         let selectedMessageData = null; 
         let currentOnlineUserSet = new Set();
-        let lastMarkedMessageId = null; // 중요: 중복 요청 방지용 변수
+        let lastMarkedMessageId = null; 
 
         function formatRelativeTime(timestamp, isOnline) {
             if (isOnline) return '현재 활동 중';
@@ -284,7 +284,6 @@
                     if (oldReadEl) oldReadEl.remove();
                 }
                 appendMessage(data, true, true);
-                scrollToBottom();
             });
 
             socket.on('message_read_updated', ({ messageId, readBy }) => {
@@ -398,7 +397,6 @@
             if (distanceToBottom <= 30) {
                 const lastMsg = chatMessages.lastElementChild;
                 if (lastMsg && lastMsg.dataset.id) {
-                    // ★ [중요] 이미 읽음 처리 보낸 마지막 메시지라면 중복 요청을 방지하여 서버 병목 차단
                     if (lastMarkedMessageId !== lastMsg.dataset.id) {
                         lastMarkedMessageId = lastMsg.dataset.id;
                         socket.emit('mark_read', lastMsg.dataset.id);
@@ -584,6 +582,7 @@
                 updateReadStatusElement(box, data.readBy);
             }
 
+            // 스크롤이 위에 올라가 있을 때 새 메시지가 오면 배너 띄우기
             if (!isNewMessage || !isScrolledUp) {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 document.getElementById('new-message-banner').style.display = 'none';
