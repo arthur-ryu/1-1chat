@@ -205,9 +205,8 @@
         let currentReply = null; 
         let typingTimer;
         let selectedMessageData = null; 
-        let currentOnlineUserSet = new Set(); // 현재 접속 중인 유저 목록 추적
+        let currentOnlineUserSet = new Set();
 
-        // 현재 접속 중인 유저는 "현재 활동 중"으로 표시
         function formatRelativeTime(timestamp, isOnline) {
             if (isOnline) return '현재 활동 중';
             if (!timestamp) return '활동 기록 없음';
@@ -290,7 +289,6 @@
 
             socket.on('receive_message', (data) => {
                 const chatMessages = document.getElementById('chat-messages');
-                // 기존 마지막 메시지에서 읽음 상태 제거 후 새로운 메시지를 마지막에 추가
                 const lastMsg = chatMessages.lastElementChild;
                 if (lastMsg) {
                     const oldReadEl = lastMsg.querySelector('.read-status');
@@ -317,7 +315,6 @@
             socket.on('update_user_list', ({ onlineList, allMembers }) => {
                 currentOnlineUserSet = new Set(onlineList);
 
-                // 1. 온라인 유저 렌더링
                 const onlineUl = document.getElementById('online-users-list');
                 onlineUl.innerHTML = '';
                 onlineList.forEach(username => {
@@ -329,7 +326,6 @@
                     onlineUl.appendChild(li);
                 });
 
-                // 2. 멤버 목록 렌더링
                 const membersUl = document.getElementById('all-members-list');
                 membersUl.innerHTML = '';
                 allMembers.forEach(member => {
@@ -412,7 +408,6 @@
         function checkAndMarkLastMessageRead() {
             const chatMessages = document.getElementById('chat-messages');
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
-            // 채팅방 하단에 위치해 있으면 항상 가장 마지막 메시지 ID를 읽음 처리 서버로 전송
             if (distanceToBottom <= 30) {
                 const lastMsg = chatMessages.lastElementChild;
                 if (lastMsg && lastMsg.dataset.id) {
@@ -529,7 +524,6 @@
                 boxEl.appendChild(readEl);
             }
 
-            // 본인을 제외하고 메시지를 읽은 다른 유저 목록 필터링
             const othersWhoRead = (readBy || []).filter(u => u !== myUsername);
             if (othersWhoRead.length === 0) {
                 readEl.innerText = '';
