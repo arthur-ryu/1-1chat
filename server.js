@@ -147,7 +147,7 @@ io.on('connection', async (socket) => {
                 if (!msg.readBy) msg.readBy = [];
                 if (!msg.readBy.includes(username)) {
                     msg.readBy.push(username);
-                    await db.collection('messages'].updateOne({ _id: id }, { $set: { readBy: msg.readBy } });
+                    await db.collection('messages').updateOne({ _id: id }, { $set: { readBy: msg.readBy } });
                     // 전체 브로드캐스트 대신 해당 메시지 갱신 이벤트만 명시적으로 송신
                     io.emit('message_read_updated', { messageId, readBy: msg.readBy });
                 }
