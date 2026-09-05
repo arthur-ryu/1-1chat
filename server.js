@@ -21,7 +21,10 @@ async function startServer() {
         const client = new MongoClient(mongoURI);
         await client.connect();
         db = client.db('chatapp');
-        console.log('MongoDB 클라우드 데이터베이스 연결 성공!');
+        
+        // DB 미리 깨우기 (웜업)
+        await db.command({ ping: 1 });
+        console.log('MongoDB 클라우드 데이터베이스 연결 및 웜업 성공!');
 
         try {
             await db.collection('messages').dropIndex("createdAt_1");
@@ -31,7 +34,6 @@ async function startServer() {
             { "createdAt": 1 }, 
             { expireAfterSeconds: 3 * 24 * 60 * 60 }
         );
-        console.log('3일 지난 메시지 자동 삭제(TTL) 설정 완료!');
 
         const PORT = process.env.PORT || 3000;
         server.listen(PORT, () => {
@@ -123,7 +125,7 @@ io.on('connection', async (socket) => {
             image: data.image || null,      
             replyTo: data.replyTo || null,  
             createdAt: new Date(),
-            readBy: [data.username] // 새로 들어온 유저가 이전 메시지들을 전부 읽음 처리하지 않도록 보낸 사람만 초기 포함
+            readBy: [data.username] // 오직 보낸 사람만 포함
         };
         
         try {
@@ -135,6 +137,7 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // ★ [핵심 수정] 오직 '전달받은 단 하나의 마지막 메시지'에만 확실하게 리드 체크 반영
     socket.on('mark_read', async (messageId) => {
         if (!username) return;
         try {
@@ -144,9 +147,10 @@ io.on('connection', async (socket) => {
                 if (!msg.readBy) msg.readBy = [];
                 if (!msg.readBy.includes(username)) {
                     msg.readBy.push(username);
-                    await db.collection('messages').updateOne({ _id: id }, { $set: { readBy: msg.readBy } });
+                    await db.collection('messages'].updateOne({ _id: id }, { $set: { readBy: msg.readBy } });
+                    // 전체 브로드캐스트 대신 해당 메시지 갱신 이벤트만 명시적으로 송신
+                    io.emit('message_read_updated', { messageId, readBy: msg.readBy });
                 }
-                io.emit('message_read_updated', { messageId, readBy: msg.readBy });
             }
         } catch (err) {
             console.error(err);
