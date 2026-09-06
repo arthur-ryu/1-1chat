@@ -137,7 +137,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // ★ [핵심 수정] 오직 '전달받은 단 하나의 마지막 메시지'에만 확실하게 리드 체크 반영
+    // ★ 오직 '전달받은 단 하나의 마지막 메시지'에만 확실하게 리드 체크 반영
     socket.on('mark_read', async (messageId) => {
         if (!username) return;
         try {
@@ -165,6 +165,59 @@ io.on('connection', async (socket) => {
                 await db.collection('messages').deleteOne({ _id: id });
                 io.emit('message_deleted', messageId);
             }
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    // ★ 이모지(공감) 추가/변경/취소 처리 로직
+    socket.on('toggle_reaction', async ({ messageId, emoji }) => {
+        if (!username) return;
+        try {
+            const id = new ObjectId(messageId);
+            const msg = await db.collection('messages').findOne({ _id: id });
+            if (!msg) return;
+
+            if (!msg.reactions) {
+                msg.reactions = {};
+            }
+
+            let existingEmojiFound = null;
+            for (const [key, users] of Object.entries(msg.reactions)) {
+                if (users.includes(username)) {
+                    existingEmojiFound = key;
+                    break;
+                }
+            }
+
+            if (existingEmojiFound === emoji) {
+                // 이미 같은 이모지면 취소(제거)
+                msg.reactions[emoji] = msg.reactions[emoji].filter(u => u !== username);
+                if (msg.reactions[emoji].length === 0) {
+                    delete msg.reactions[emoji];
+                }
+            } else {
+                // 다른 이모지였거나 처음 누르는 경우
+                if (existingEmojiFound) {
+                    msg.reactions[existingEmojiFound] = msg.reactions[existingEmojiFound].filter(u => u !== username);
+                    if (msg.reactions[existingEmojiFound].length === 0) {
+                        delete msg.reactions[existingEmojiFound];
+                    }
+                }
+                if (!msg.reactions[emoji]) {
+                    msg.reactions[emoji] = [];
+                }
+                if (!msg.reactions[emoji].includes(username)) {
+                    msg.reactions[emoji].push(username);
+                }
+            }
+
+            await db.collection('messages').updateOne(
+                { _id: id },
+                { $set: { reactions: msg.reactions } }
+            );
+
+            io.emit('reaction_updated', { messageId, reactions: msg.reactions });
         } catch (err) {
             console.error(err);
         }
