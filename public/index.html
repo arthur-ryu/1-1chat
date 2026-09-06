@@ -50,7 +50,7 @@
         .reply-quote { background: rgba(0,0,0,0.06); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #444; margin-bottom: 4px; border-left: 3px solid #3c1e1e; }
         .chat-image { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 4px; display: block; }
 
-        .chat-input-area { padding: 10px; background-color: #f0f0f0; display: flex; flex-direction: column; gap: 6px; }
+        .chat-input-area { padding: 10px; background-color: #f0f0f0; display: flex; flex-direction: column; gap: 6px; position: relative; }
         .input-row { display: flex; gap: 8px; align-items: center; width: 100%; }
         .btn-attach { background: #ddd; border: none; width: 36px; height: 36px; border-radius: 4px; font-weight: bold; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; color: #555; }
         .btn-attach:hover { background: #ccc; }
@@ -125,6 +125,58 @@
         .chat-menu-item:last-child { border-bottom: none; }
         .chat-menu-item:hover { background: #f5f5f5; }
         .chat-menu-item.delete { color: #d9534f; }
+
+        /* Mention Dropdown */
+        #mention-dropdown {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            max-height: 130px;
+            overflow-y: auto;
+            z-index: 40;
+            width: 180px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .mention-item {
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            color: #333;
+            border-bottom: 1px solid #eee;
+        }
+        .mention-item:last-child { border-bottom: none; }
+        .mention-item:hover { background: #f0f0f0; }
+        .mention-highlight {
+            color: #0066ff;
+            font-weight: bold;
+        }
+
+        /* Dark Mode Overrides */
+        .container.dark-mode { background-color: #18191a !important; color: #e4e6eb !important; }
+        .container.dark-mode .chat-header { background-color: #242526 !important; color: #e4e6eb !important; }
+        .container.dark-mode #user-list-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
+        .container.dark-mode .chat-messages { background-color: #18191a !important; }
+        .container.dark-mode .other .bubble { background-color: #242526 !important; color: #e4e6eb !important; }
+        .container.dark-mode .mine .bubble { background-color: #d29922 !important; color: #000 !important; }
+        .container.dark-mode .sender-name { color: #b0b3b8 !important; }
+        .container.dark-mode .time { color: #b0b3b8 !important; }
+        .container.dark-mode .read-status { color: #b0b3b8 !important; }
+        .container.dark-mode .chat-input-area { background-color: #242526 !important; }
+        .container.dark-mode .chat-input-area textarea { background-color: #3a3b3c !important; color: #e4e6eb !important; }
+        .container.dark-mode .chat-input-area textarea::placeholder { color: #b0b3b8; }
+        .container.dark-mode .btn-attach { background: #3a3b3c !important; color: #e4e6eb !important; }
+        .container.dark-mode .send-btn { background-color: #d29922 !important; color: #000 !important; }
+        .container.dark-mode #reply-preview-bar { background: #3a3b3c !important; color: #e4e6eb !important; }
+        .container.dark-mode #reply-preview-bar button { color: #b0b3b8 !important; }
+        .container.dark-mode #typing-notice { color: #b0b3b8 !important; }
+        .container.dark-mode .reply-quote { background: rgba(255,255,255,0.1) !important; color: #e4e6eb !important; border-left-color: #d29922 !important; }
+        .container.dark-mode #mention-dropdown { background: #242526 !important; border-color: #3a3b3c !important; }
+        .container.dark-mode .mention-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
+        .container.dark-mode .mention-item:hover { background: #3a3b3c !important; }
     </style>
 </head>
 <body>
@@ -147,7 +199,7 @@
 
         <div id="chat-screen">
             <div class="chat-header">
-                <span id="room-title">1-1 채팅</span>
+                <span id="room-title" onclick="handleTitleClick()" style="cursor: pointer;">1-1 채팅</span>
                 <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
             </div>
             
@@ -161,6 +213,7 @@
             </div>
 
             <div class="chat-input-area">
+                <div id="mention-dropdown"></div>
                 <div id="reply-preview-bar">
                     <span id="reply-preview-text"></span>
                     <button onclick="cancelReply()">✕</button>
@@ -170,7 +223,7 @@
                     <button class="btn-attach" onclick="document.getElementById('image-input').click()">+</button>
                     <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="sendImage(this)">
                     
-                    <textarea id="message-input" placeholder="메시지를 입력하세요..." oninput="handleTyping()" onkeydown="handleKeyDown(event)"></textarea>
+                    <textarea id="message-input" placeholder="메시지를 입력하세요..." oninput="handleMessageInput()" onkeydown="handleKeyDown(event)"></textarea>
                     <button class="send-btn" onclick="sendMessage()">전송</button>
                 </div>
             </div>
@@ -207,6 +260,18 @@
         let selectedMessageData = null; 
         let currentOnlineUserSet = new Set();
         let lastMarkedMessageId = null; 
+        let titleClickCount = 0;
+        let isDarkMode = false;
+        let cachedMembers = [];
+
+        function handleTitleClick() {
+            titleClickCount++;
+            if (titleClickCount >= 10) {
+                titleClickCount = 0;
+                isDarkMode = !isDarkMode;
+                document.querySelector('.container').classList.toggle('dark-mode', isDarkMode);
+            }
+        }
 
         function formatRelativeTime(timestamp, isOnline) {
             if (isOnline) return '현재 활동 중';
@@ -300,6 +365,7 @@
 
             socket.on('update_user_list', ({ onlineList, allMembers }) => {
                 currentOnlineUserSet = new Set(onlineList);
+                cachedMembers = allMembers.map(m => m.username);
 
                 const onlineUl = document.getElementById('online-users-list');
                 onlineUl.innerHTML = '';
@@ -351,6 +417,11 @@
             modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
         }
 
+        function handleMessageInput() {
+            handleTyping();
+            checkMentionTrigger();
+        }
+
         function handleTyping() {
             socket.emit('typing', true);
             clearTimeout(typingTimer);
@@ -359,7 +430,70 @@
             }, 1500);
         }
 
+        function checkMentionTrigger() {
+            const input = document.getElementById('message-input');
+            const val = input.value;
+            const pos = input.selectionStart;
+            
+            const textBeforeCursor = val.substring(0, pos);
+            const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+            const dropdown = document.getElementById('mention-dropdown');
+            
+            if (lastAtIndex !== -1) {
+                const query = textBeforeCursor.substring(lastAtIndex + 1);
+                if (!/\s/.test(query)) {
+                    showMentionDropdown(query, lastAtIndex);
+                    return;
+                }
+            }
+            dropdown.style.display = 'none';
+        }
+
+        function showMentionDropdown(query, atIndex) {
+            const dropdown = document.getElementById('mention-dropdown');
+            dropdown.innerHTML = '';
+            
+            const filtered = cachedMembers.filter(m => m.toLowerCase().includes(query.toLowerCase()));
+            if (filtered.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            filtered.forEach(name => {
+                const item = document.createElement('div');
+                item.className = 'mention-item';
+                item.innerText = '@' + name;
+                item.onclick = () => {
+                    insertMention(name, atIndex);
+                };
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
+        }
+
+        function insertMention(username, atIndex) {
+            const input = document.getElementById('message-input');
+            const val = input.value;
+            const pos = input.selectionStart;
+            
+            const before = val.substring(0, atIndex);
+            const after = val.substring(pos);
+            
+            input.value = before + '@' + username + ' ' + after;
+            input.focus();
+            const newPos = atIndex + username.length + 2;
+            input.setSelectionRange(newPos, newPos);
+            
+            document.getElementById('mention-dropdown').style.display = 'none';
+        }
+
         function handleKeyDown(event) {
+            const dropdown = document.getElementById('mention-dropdown');
+            if (dropdown.style.display === 'flex' || dropdown.style.display === 'block') {
+                if (event.key === 'Escape') {
+                    dropdown.style.display = 'none';
+                }
+            }
             if (event.isComposing || event.keyCode === 229) return;
             if (event.key === 'Enter') {
                 if (event.shiftKey) return;
@@ -426,8 +560,10 @@
             });
 
             input.value = '';
+            document.getElementById('mention-dropdown').style.display = 'none';
             socket.emit('typing', false);
             cancelReply();
+            input.focus(); // Keep mobile keyboard active
         }
 
         function sendImage(input) {
@@ -525,6 +661,18 @@
             }
         }
 
+        function formatMessageText(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            let escaped = div.innerHTML;
+            
+            escaped = escaped.replace(/@([^\s]+)/g, (match) => {
+                return `<span class="mention-highlight">${match}</span>`;
+            });
+            return escaped;
+        }
+
         function appendMessage(data, isNewMessage, isLastMessage = false) {
             const chatMessages = document.getElementById('chat-messages');
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
@@ -560,7 +708,7 @@
             if (data.message) {
                 const bubble = document.createElement('div');
                 bubble.className = 'bubble';
-                bubble.innerText = data.message;
+                bubble.innerHTML = formatMessageText(data.message);
                 box.appendChild(bubble);
             }
 
@@ -582,7 +730,6 @@
                 updateReadStatusElement(box, data.readBy);
             }
 
-            // 스크롤이 위에 올라가 있을 때 새 메시지가 오면 배너 띄우기
             if (!isNewMessage || !isScrolledUp) {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 document.getElementById('new-message-banner').style.display = 'none';
