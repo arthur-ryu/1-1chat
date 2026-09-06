@@ -33,7 +33,7 @@
         .chat-messages-wrapper { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         
-        .message-box { display: flex; flex-direction: column; max-width: 75%; cursor: pointer; }
+        .message-box { display: flex; flex-direction: column; max-width: 75%; cursor: pointer; position: relative; }
         .message-box.mine { align-self: flex-end; align-items: flex-end; }
         .message-box.other { align-self: flex-start; align-items: flex-start; }
         .sender-name { font-size: 11px; color: #555; margin-bottom: 3px; }
@@ -43,12 +43,42 @@
         .other .bubble { background-color: #fff; color: #000; border-top-left-radius: 2px; }
         
         .time { font-size: 9px; color: #777; margin-top: 2px; align-self: flex-end; }
+        .mine .time { align-self: flex-end; }
+        .other .time { align-self: flex-end; }
         .read-status { font-size: 10px; color: #888; margin-top: 2px; }
         .mine .read-status { align-self: flex-end; }
         .other .read-status { align-self: flex-start; }
 
         .reply-quote { background: rgba(0,0,0,0.06); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #444; margin-bottom: 4px; border-left: 3px solid #3c1e1e; }
         .chat-image { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 4px; display: block; }
+
+        /* Reactions under message */
+        .reaction-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .mine .reaction-container { justify-content: flex-end; }
+        .other .reaction-container { justify-content: flex-start; }
+
+        .reaction-badge {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            user-select: none;
+        }
+        .reaction-badge.my-reaction {
+            background: #eef3fc;
+            border-color: #1877f2;
+        }
 
         .chat-input-area { padding: 10px; background-color: #f0f0f0; display: flex; flex-direction: column; gap: 6px; position: relative; }
         .input-row { display: flex; gap: 8px; align-items: center; width: 100%; }
@@ -120,11 +150,34 @@
         .modal-close-btn { align-self: flex-end; padding: 6px 12px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
 
         #chat-menu-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); justify-content: center; align-items: center; z-index: 30; }
-        .chat-menu-content { background: #fff; width: 180px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+        .chat-menu-content { background: #fff; width: 220px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+        
+        /* Reaction quick-pick tray inside context menu */
+        .reaction-pick-tray {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 8px;
+            background: #f7f7f7;
+            border-bottom: 1px solid #eee;
+        }
+        .reaction-pick-item {
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .reaction-pick-item:hover { transform: scale(1.2); }
+
         .chat-menu-item { padding: 12px; text-align: center; border-bottom: 1px solid #eee; background: none; border: none; font-size: 14px; cursor: pointer; font-weight: bold; color: #333; }
         .chat-menu-item:last-child { border-bottom: none; }
         .chat-menu-item:hover { background: #f5f5f5; }
         .chat-menu-item.delete { color: #d9534f; }
+
+        /* Reaction details tooltip / modal */
+        #reaction-detail-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); justify-content: center; align-items: center; z-index: 40; }
+        .reaction-detail-content { background: #fff; width: 200px; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .reaction-detail-title { font-size: 12px; font-weight: bold; color: #555; border-bottom: 1px solid #eee; padding-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+        .reaction-detail-list { font-size: 13px; color: #333; list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; }
+        .reaction-detail-list li { padding: 4px 6px; background: #f9f9f9; border-radius: 4px; display: flex; justify-content: space-between; }
 
         /* Mention Dropdown */
         #mention-dropdown {
@@ -150,10 +203,7 @@
         }
         .mention-item:last-child { border-bottom: none; }
         .mention-item:hover { background: #f0f0f0; }
-        .mention-highlight {
-            color: #0066ff;
-            font-weight: bold;
-        }
+        .mention-highlight { color: #0066ff; font-weight: bold; }
 
         /* Dark Mode Overrides */
         .container.dark-mode { background-color: #18191a !important; color: #e4e6eb !important; }
@@ -174,6 +224,15 @@
         .container.dark-mode #reply-preview-bar button { color: #b0b3b8 !important; }
         .container.dark-mode #typing-notice { color: #b0b3b8 !important; }
         .container.dark-mode .reply-quote { background: rgba(255,255,255,0.1) !important; color: #e4e6eb !important; border-left-color: #d29922 !important; }
+        .container.dark-mode .reaction-badge { background: #242526 !important; border-color: #3a3b3c !important; color: #e4e6eb !important; }
+        .container.dark-mode .reaction-badge.my-reaction { background: #3a3b3c !important; border-color: #d29922 !important; }
+        .container.dark-mode .chat-menu-content { background: #242526 !important; color: #e4e6eb !important; }
+        .container.dark-mode .reaction-pick-tray { background: #18191a !important; border-bottom: 1px solid #3a3b3c !important; }
+        .container.dark-mode .chat-menu-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
+        .container.dark-mode .chat-menu-item:hover { background: #3a3b3c !important; }
+        .container.dark-mode .reaction-detail-content { background: #242526 !important; color: #e4e6eb !important; }
+        .container.dark-mode .reaction-detail-title { border-bottom: 1px solid #3a3b3c !important; color: #b0b3b8 !important; }
+        .container.dark-mode .reaction-detail-list li { background: #3a3b3c !important; color: #e4e6eb !important; }
         .container.dark-mode #mention-dropdown { background: #242526 !important; border-color: #3a3b3c !important; }
         .container.dark-mode .mention-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
         .container.dark-mode .mention-item:hover { background: #3a3b3c !important; }
@@ -246,7 +305,22 @@
 
             <div id="chat-menu-modal" onclick="if(event.target === this) closeChatMenu()">
                 <div class="chat-menu-content" id="chat-menu-box">
+                    <div class="reaction-pick-tray">
+                        <span class="reaction-pick-item" onclick="actionReact('❤️')">❤️</span>
+                        <span class="reaction-pick-item" onclick="actionReact('👍')">👍</span>
+                        <span class="reaction-pick-item" onclick="actionReact('✅')">✅</span>
+                        <span class="reaction-pick-item" onclick="actionReact('😄')">😄</span>
+                        <span class="reaction-pick-item" onclick="actionReact('😢')">😢</span>
+                        <span class="reaction-pick-item" onclick="actionReact('🔥')">🔥</span>
+                    </div>
                     <button class="chat-menu-item" onclick="actionReply()">답장하기</button>
+                </div>
+            </div>
+
+            <div id="reaction-detail-modal" onclick="if(event.target === this) closeReactionDetail()">
+                <div class="reaction-detail-content">
+                    <div class="reaction-detail-title" id="reaction-detail-title"></div>
+                    <ul id="reaction-detail-list" class="reaction-detail-list"></ul>
                 </div>
             </div>
         </div>
@@ -263,6 +337,8 @@
         let titleClickCount = 0;
         let isDarkMode = false;
         let cachedMembers = [];
+
+        const AVAILABLE_REACTIONS = ['❤️', '👍', '✅', '😄', '😢', '🔥'];
 
         function handleTitleClick() {
             titleClickCount++;
@@ -363,6 +439,17 @@
                 if (msgEl) msgEl.remove();
             });
 
+            socket.on('reaction_updated', ({ messageId, reactions }) => {
+                const msgEl = document.getElementById(`msg-${messageId}`);
+                if (msgEl) {
+                    // Update stored data reference if needed
+                    const container = msgEl.querySelector('.reaction-container');
+                    if (container) {
+                        renderReactions(container, reactions, getMessageData(msgEl));
+                    }
+                }
+            });
+
             socket.on('update_user_list', ({ onlineList, allMembers }) => {
                 currentOnlineUserSet = new Set(onlineList);
                 cachedMembers = allMembers.map(m => m.username);
@@ -410,6 +497,15 @@
                     noticeEl.innerText = `${otherTyping[0]}님 외 ${otherTyping.length - 1}명이 입력 중입니다...`;
                 }
             });
+        }
+
+        function getMessageData(msgEl) {
+            return {
+                _id: msgEl.dataset.id,
+                username: msgEl.dataset.username,
+                message: msgEl.dataset.message,
+                image: msgEl.dataset.image
+            };
         }
 
         function toggleUserModal() {
@@ -563,7 +659,7 @@
             document.getElementById('mention-dropdown').style.display = 'none';
             socket.emit('typing', false);
             cancelReply();
-            input.focus(); // Keep mobile keyboard active
+            input.focus();
         }
 
         function sendImage(input) {
@@ -610,16 +706,23 @@
             const menuModal = document.getElementById('chat-menu-modal');
             const menuBox = document.getElementById('chat-menu-box');
             
-            menuBox.innerHTML = `
+            let html = `
+                <div class="reaction-pick-tray">
+                    <span class="reaction-pick-item" onclick="actionReact('❤️')">❤️</span>
+                    <span class="reaction-pick-item" onclick="actionReact('👍')">👍</span>
+                    <span class="reaction-pick-item" onclick="actionReact('✅')">✅</span>
+                    <span class="reaction-pick-item" onclick="actionReact('😄')">😄</span>
+                    <span class="reaction-pick-item" onclick="actionReact('😢')">😢</span>
+                    <span class="reaction-pick-item" onclick="actionReact('🔥')">🔥</span>
+                </div>
                 <button class="chat-menu-item" onclick="actionReply()">답장하기</button>
             `;
 
             if (data.username === myUsername && data._id) {
-                menuBox.innerHTML += `
-                    <button class="chat-menu-item delete" onclick="actionDelete()">삭제하기</button>
-                `;
+                html += `<button class="chat-menu-item delete" onclick="actionDelete()">삭제하기</button>`;
             }
 
+            menuBox.innerHTML = html;
             menuModal.style.display = 'flex';
         }
 
@@ -639,6 +742,40 @@
             if (selectedMessageData && selectedMessageData._id) {
                 socket.emit('delete_message', selectedMessageData._id);
             }
+        }
+
+        function actionReact(emoji) {
+            closeChatMenu();
+            if (selectedMessageData && selectedMessageData._id) {
+                socket.emit('toggle_reaction', { messageId: selectedMessageData._id, emoji });
+            }
+        }
+
+        function handleReactionBadgeClick(messageId, emoji, reactions) {
+            // If user clicks an existing reaction badge:
+            // Toggle/change behavior: If user already reacted with this, remove it. If reacted with another, switch/add.
+            // Let's emit toggle_reaction directly.
+            socket.emit('toggle_reaction', { messageId, emoji });
+        }
+
+        function showReactionDetail(emoji, users) {
+            const modal = document.getElementById('reaction-detail-modal');
+            const titleEl = document.getElementById('reaction-detail-title');
+            const listEl = document.getElementById('reaction-detail-list');
+
+            titleEl.innerHTML = `<span>${emoji}</span> 반응한 사람 (${users.length})`;
+            listEl.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.innerText = user;
+                listEl.appendChild(li);
+            });
+
+            modal.style.display = 'flex';
+        }
+
+        function closeReactionDetail() {
+            document.getElementById('reaction-detail-modal').style.display = 'none';
         }
 
         function updateReadStatusElement(boxEl, readBy) {
@@ -673,6 +810,52 @@
             return escaped;
         }
 
+        function renderReactions(containerEl, reactions, messageData) {
+            containerEl.innerHTML = '';
+            if (!reactions) return;
+
+            // reactions format expected: { '❤️': ['user1', 'user2'], '👍': ['user3'] }
+            for (const [emoji, users] of Object.entries(reactions)) {
+                if (!users || users.length === 0) continue;
+
+                const badge = document.createElement('div');
+                badge.className = 'reaction-badge';
+                const isMyReaction = users.includes(myUsername);
+                if (isMyReaction) {
+                    badge.classList.add('my-reaction');
+                }
+
+                badge.innerHTML = `<span>${emoji}</span><span>${users.length}</span>`;
+
+                // Clicking the badge toggles/adds/removes the reaction
+                badge.onclick = (e) => {
+                    e.stopPropagation();
+                    handleReactionBadgeClick(messageData._id, emoji, reactions);
+                };
+
+                // Long press / right click to see who reacted
+                badge.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showReactionDetail(emoji, users);
+                };
+
+                // Mobile long press support for reaction badge
+                let pressTimer;
+                badge.ontouchstart = (e) => {
+                    pressTimer = setTimeout(() => {
+                        e.preventDefault();
+                        showReactionDetail(emoji, users);
+                    }, 600);
+                };
+                badge.ontouchend = () => {
+                    clearTimeout(pressTimer);
+                };
+
+                containerEl.appendChild(badge);
+            }
+        }
+
         function appendMessage(data, isNewMessage, isLastMessage = false) {
             const chatMessages = document.getElementById('chat-messages');
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
@@ -685,10 +868,29 @@
                 box.id = `msg-${data._id}`;
                 box.dataset.id = data._id;
             }
+            box.dataset.username = data.username;
+            box.dataset.message = data.message || '';
+            box.dataset.image = data.image || '';
 
             box.oncontextmenu = (e) => {
                 e.preventDefault();
                 openChatMenu(data);
+            };
+
+            // Mobile long press support on message box
+            let pressTimer;
+            box.ontouchstart = (e) => {
+                // If touching reaction container elements, skip menu
+                if (e.target.closest('.reaction-badge')) return;
+                pressTimer = setTimeout(() => {
+                    openChatMenu(data);
+                }, 600);
+            };
+            box.ontouchend = () => {
+                clearTimeout(pressTimer);
+            };
+            box.ontouchmove = () => {
+                clearTimeout(pressTimer);
             };
 
             if (!isMine) {
@@ -718,6 +920,12 @@
                 img.className = 'chat-image';
                 box.appendChild(img);
             }
+
+            // Reaction Container
+            const reactionContainer = document.createElement('div');
+            reactionContainer.className = 'reaction-container';
+            renderReactions(reactionContainer, data.reactions, data);
+            box.appendChild(reactionContainer);
 
             const time = document.createElement('span');
             time.className = 'time';
