@@ -442,7 +442,6 @@
             socket.on('reaction_updated', ({ messageId, reactions }) => {
                 const msgEl = document.getElementById(`msg-${messageId}`);
                 if (msgEl) {
-                    // Update stored data reference if needed
                     const container = msgEl.querySelector('.reaction-container');
                     if (container) {
                         renderReactions(container, reactions, getMessageData(msgEl));
@@ -752,9 +751,6 @@
         }
 
         function handleReactionBadgeClick(messageId, emoji, reactions) {
-            // If user clicks an existing reaction badge:
-            // Toggle/change behavior: If user already reacted with this, remove it. If reacted with another, switch/add.
-            // Let's emit toggle_reaction directly.
             socket.emit('toggle_reaction', { messageId, emoji });
         }
 
@@ -814,7 +810,6 @@
             containerEl.innerHTML = '';
             if (!reactions) return;
 
-            // reactions format expected: { '❤️': ['user1', 'user2'], '👍': ['user3'] }
             for (const [emoji, users] of Object.entries(reactions)) {
                 if (!users || users.length === 0) continue;
 
@@ -827,20 +822,17 @@
 
                 badge.innerHTML = `<span>${emoji}</span><span>${users.length}</span>`;
 
-                // Clicking the badge toggles/adds/removes the reaction
                 badge.onclick = (e) => {
                     e.stopPropagation();
                     handleReactionBadgeClick(messageData._id, emoji, reactions);
                 };
 
-                // Long press / right click to see who reacted
                 badge.oncontextmenu = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     showReactionDetail(emoji, users);
                 };
 
-                // Mobile long press support for reaction badge
                 let pressTimer;
                 badge.ontouchstart = (e) => {
                     pressTimer = setTimeout(() => {
@@ -877,10 +869,8 @@
                 openChatMenu(data);
             };
 
-            // Mobile long press support on message box
             let pressTimer;
             box.ontouchstart = (e) => {
-                // If touching reaction container elements, skip menu
                 if (e.target.closest('.reaction-badge')) return;
                 pressTimer = setTimeout(() => {
                     openChatMenu(data);
@@ -921,7 +911,6 @@
                 box.appendChild(img);
             }
 
-            // Reaction Container
             const reactionContainer = document.createElement('div');
             reactionContainer.className = 'reaction-container';
             renderReactions(reactionContainer, data.reactions, data);
