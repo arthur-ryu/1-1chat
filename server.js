@@ -134,7 +134,7 @@ async function handleBotCommands(commandText, senderUsername) {
             '• /출석체크 : 오늘의 출석을 체크하고 연속 출석일수를 확인합니다.',
             '• /출석랭킹 : 멤버들의 출석 누적 랭킹 TOP 10을 확인합니다.',
             '• /랜덤뽑기 : 전체 멤버 중 무작위 1명을 지목합니다.',
-            '• /순서뽑기 : 전체 멤버의 순서를 무작위로 섞어 배치합니다.',
+            '• /순서뽑기 : 전체 멤버의 순서를 무작위로 섞어 출력합니다.',
             '• /help : 명령어 목록을 확인합니다.'
         ].join('\n');
         await sendBotMessage(helpText);
@@ -219,7 +219,7 @@ async function handleBotCommands(commandText, senderUsername) {
             }
 
             const medal = ['🥇', '🥈', '🥉'];
-            let rankText = '🏆 [출석체크 명예의 전당]\n';
+            let rankText = '🏆 [출석체크 랭킹]\n';
             topUsers.forEach((u, idx) => {
                 const rankPrefix = medal[idx] || `${idx + 1}위`;
                 rankText += `${rankPrefix} ${u.username} : 총 ${u.attendanceCount}회 (연속 ${u.streak || 0}일)\n`;
@@ -240,7 +240,7 @@ async function handleBotCommands(commandText, senderUsername) {
                 return true;
             }
             const picked = allMembers[Math.floor(Math.random() * allMembers.length)].username;
-            await sendBotMessage(`🎯 랜덤 당첨자: @${picked} 님 축하합니다! 🎉`);
+            await sendBotMessage(`🎯 랜덤 당첨자: @${picked} 님 🎉`);
         } catch (err) {
             console.error('랜덤뽑기 실패:', err);
         }
