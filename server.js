@@ -155,7 +155,7 @@ async function sendBotMessage(text) {
 }
 
 // 봇 명령어 핸들러
-async function handleBotCommands(commandText, senderUsername) {
+async function handleBotCommands(commandText, senderUsername, replyToData = null) {
     const cmd = commandText.trim();
 
     if (cmd === '/help') {
@@ -170,29 +170,36 @@ async function handleBotCommands(commandText, senderUsername) {
         ];
         if (senderUsername === 'admin') {
             helpLines.push('--- [관리자 전용] ---');
-            helpLines.push('• /kick @유저이름 : 유저를 채팅방에서 추방');
-            helpLines.push('• /unkick @유저이름 : 추방된 유저 추방 해제');
-            helpLines.push('• /klist : 추방된 유저 목록');
+            helpLines.push('• /kick [@유저이름 또는 답장] : 유저를 채팅방에서 추방');
+            helpLines.push('• /unkick @유저이름 : 킥된 유저의 추방 해제');
+            helpLines.push('• /klist : 킥된 유저 목록');
+            helpLines.push('• /alldel [답장 필수] : 답장한 메시지부터 그 아래 모든 메시지 삭제');
             helpLines.push('• /ip : IP 확인');
-            helpLines.push('• /ip필터링 @유저이름 : 해당 유저의 IP 방지(필터) 토글');
+            helpLines.push('• /ip필터링 @유저이름 : 해당 유저의 IP(필터) 토글');
             helpLines.push('• /ip필터목록 : IP 필터링 등록된 유저 목록');
         }
         await sendBotMessage(helpLines.join('\n'));
         return true;
     }
 
-    // --- admin 전용 명령어: /kick, /unkick, /klist ---
+    // --- admin 전용 명령어: /kick (답장 또는 @닉네임 지원) ---
     if (cmd.startsWith('/kick')) {
         if (senderUsername !== 'admin') {
             await sendBotMessage(`⚠️ /kick 명령어는 관리자 계정만 사용할 수 있습니다.`);
             return true;
         }
 
+        let target = '';
         const rawTarget = cmd.slice(5).trim();
-        const target = rawTarget.replace(/^@/, '').trim();
+
+        if (rawTarget) {
+            target = rawTarget.replace(/^@/, '').trim();
+        } else if (replyToData && replyToData.username) {
+            target = replyToData.username;
+        }
 
         if (!target) {
-            await sendBotMessage(`⚠️ 킥할 유저 닉네임을 입력해주세요. 예) /kick @홍길동`);
+            await sendBotMessage(`⚠️ 킥할 유저 닉네임을 입력하거나 대상 유저의 메시지에 답장해주세요. 예) /kick @김은아`);
             return true;
         }
 
@@ -224,15 +231,15 @@ async function handleBotCommands(commandText, senderUsername) {
         const target = rawTarget.replace(/^@/, '').trim();
 
         if (!target) {
-            await sendBotMessage(`⚠️ 추방 해제할 유저 닉네임을 입력해주세요. 예) /unkick @김은아`);
+            await sendBotMessage(`⚠️ 킥 해제할 유저 닉네임을 입력해주세요. 예) /unkick @김은아`);
             return true;
         }
 
         if (kickedUsers.has(target)) {
             kickedUsers.delete(target);
-            await sendBotMessage(`✅ [관리자 안내] @${target} 님의 추방이 해제되었습니다.`);
+            await sendBotMessage(`✅ [관리자 안내] @${target} 님의 추방 해제되었습니다.`);
         } else {
-            await sendBotMessage(`⚠️ @${target} 님은 현재 추방 목록에 없습니다.`);
+            await sendBotMessage(`⚠️ @${target} 님은 현재 킥 목록에 없습니다.`);
         }
         return true;
     }
@@ -244,7 +251,7 @@ async function handleBotCommands(commandText, senderUsername) {
         }
 
         if (kickedUsers.size === 0) {
-            await sendBotMessage(`📋 현재 추방된 유저가 없습니다.`);
+            await sendBotMessage(`📋 현재 킥된 유저가 없습니다.`);
         } else {
             const listText = Array.from(kickedUsers).map((u, i) => `${i + 1}. @${u}`).join('\n');
             await sendBotMessage(`🚫 [추방(킥) 유저 목록]\n${listText}`);
@@ -252,52 +259,85 @@ async function handleBotCommands(commandText, senderUsername) {
         return true;
     }
 
-    // --- admin 전용 명령어: /ip, /ip필터링, /ip필터목록 ---
+    // --- admin 전용 명령어: /alldel ---
+    if (cmd === '/alldel') {
+        if (senderUsername !== 'admin') {
+            await sendBotMessage(`⚠️ /alldel 명령어는 관리자 계정만 사용할 수 있습니다.`);
+            return true;
+        }
+
+        if (!replyToData) {
+            await sendBotMessage(`⚠️ /alldel 은 삭제를 시작할 기준 메시지에 답장으로 입력해야 합니다.`);
+            return true;
+        }
+
+        try {
+            const query = { username: replyToData.username };
+            if (replyToData.text === '[이미지]') {
+                query.image = { $ne: null };
+            } else {
+                query.message = replyToData.text;
+            }
+
+            const targetMsg = await db.collection('messages').findOne(query, { sort: { _id: -1 } });
+
+            if (!targetMsg) {
+                await sendBotMessage(`⚠️ 기준 메시지를 DB에서 찾을 수 없습니다.`);
+                return true;
+            }
+
+            const messagesToDelete = await db.collection('messages')
+                .find({ createdAt: { $gte: targetMsg.createdAt } })
+                .toArray();
+
+            if (messagesToDelete.length > 0) {
+                const idsToDelete = messagesToDelete.map(m => m._id);
+                await db.collection('messages').deleteMany({ _id: { $in: idsToDelete } });
+
+                idsToDelete.forEach(id => {
+                    emitToActiveUsers('message_deleted', id.toString());
+                });
+
+                await sendBotMessage(`🗑️ 기준 메시지를 포함해 이후 ${messagesToDelete.length}개의 메시지가 삭제되었습니다.`);
+            }
+        } catch (err) {
+            console.error('alldel 처리 실패:', err);
+        }
+        return true;
+    }
+
+    // --- admin 전용 명령어: /ip (실시간 접속 유저 IP 전체 출력) ---
     if (cmd === '/ip') {
         if (senderUsername !== 'admin') {
             await sendBotMessage(`⚠️ /ip 명령어는 관리자 계정만 사용할 수 있습니다.`);
             return true;
         }
 
-        try {
-            // 직전 메시지를 찾아 해당 메시지를 읽은 유저 목록 추출
-            const lastMsg = await db.collection('messages')
-                .find({ username: { $ne: 'bot' } })
-                .sort({ _id: -1 })
-                .limit(1)
-                .toArray();
+        // 현재 실시간 접속(온라인) 중인 유저 명단 추출 (중복 제거)
+        const activeUsers = Array.from(new Set(Object.values(onlineUsers)));
 
-            if (!lastMsg || lastMsg.length === 0) {
-                await sendBotMessage('조회할 수 있는 최근 메시지가 없습니다.');
-                return true;
-            }
-
-            const readUsers = (lastMsg[0].readBy || []).filter(u => u !== 'bot');
-
-            if (readUsers.length === 0) {
-                await sendBotMessage('최근 메시지를 읽은 유저가 아직 없습니다.');
-                return true;
-            }
-
-            let ipReport = '🌐 [최근 메시지 읽은 유저 IP 목록]\n';
-            readUsers.forEach((u, i) => {
-                let displayIp;
-                if (ipFilteredUsers.has(u)) {
-                    displayIp = '[보호됨 / 필터링 적용]';
-                } else {
-                    const currentIp = userIpMap.get(u);
-                    displayIp = currentIp ? cleanIp(currentIp) : '현재 미접속 (알 수 없음)';
-                }
-                ipReport += `${i + 1}. @${u} : ${displayIp}\n`;
-            });
-
-            await sendBotMessage(ipReport.trim());
-        } catch (err) {
-            console.error('IP 조회 실패:', err);
+        if (activeUsers.length === 0) {
+            await sendBotMessage('현재 접속 중인 유저가 없습니다.');
+            return true;
         }
+
+        let ipReport = `🌐 [실시간 접속자 IP 목록 (${activeUsers.length}명)]\n`;
+        activeUsers.forEach((u, i) => {
+            let displayIp;
+            if (ipFilteredUsers.has(u)) {
+                displayIp = '[보호됨 / 필터링 적용]';
+            } else {
+                const currentIp = userIpMap.get(u);
+                displayIp = currentIp ? cleanIp(currentIp) : 'IP 확인 불가';
+            }
+            ipReport += `${i + 1}. @${u} : ${displayIp}\n`;
+        });
+
+        await sendBotMessage(ipReport.trim());
         return true;
     }
 
+    // --- admin 전용 명령어: /ip필터링, /ip필터목록 ---
     if (cmd.startsWith('/ip필터링')) {
         if (senderUsername !== 'admin') {
             await sendBotMessage(`⚠️ /ip필터링 명령어는 관리자 계정만 사용할 수 있습니다.`);
@@ -486,7 +526,6 @@ async function broadcastUserList() {
 io.on('connection', async (socket) => {
     const username = socket.handshake.query.username;
 
-    // 접속 클라이언트 IP 추출 및 캐싱
     const rawIp = socket.handshake.headers['x-forwarded-for'] 
         ? socket.handshake.headers['x-forwarded-for'].split(',')[0].trim() 
         : socket.handshake.address;
@@ -508,14 +547,13 @@ io.on('connection', async (socket) => {
         broadcastUserList();
     }
 
-    // 킥된 유저는 기존 내역을 불러오지 않음
     if (!kickedUsers.has(username)) {
         db.collection('messages').find().toArray().then(history => {
             socket.emit('load_history', history);
         }).catch(err => console.error(err));
     }
 
-    // 1. 메시지 전송 (킥 유저 차단)
+    // 1. 메시지 전송
     socket.on('send_message', async (data) => {
         if (kickedUsers.has(username)) return;
 
@@ -542,16 +580,16 @@ io.on('connection', async (socket) => {
             messageData._id = result.insertedId;
             emitToActiveUsers('receive_message', messageData);
 
-            // 봇 명령어 감지 및 수행
+            // 봇 명령어 감지
             if (data.message && data.message.startsWith('/')) {
-                await handleBotCommands(data.message, data.username);
+                await handleBotCommands(data.message, data.username, data.replyTo);
             }
         } catch (err) {
             console.error(err);
         }
     });
 
-    // 2. 읽음 표시 처리 (킥 유저 차단)
+    // 2. 읽음 표시 처리
     socket.on('mark_read', async (messageId) => {
         if (!username || kickedUsers.has(username)) return;
         try {
