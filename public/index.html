@@ -26,9 +26,10 @@
 
         #chat-screen { display: none; flex-direction: column; height: 100%; position: relative; }
         .chat-header { background-color: #1f1f1f; color: #fff; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .header-btn-group { display: flex; gap: 6px; align-items: center; }
         
-        #user-list-btn { background: #333; color: #fff; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
-        #user-list-btn:hover { background: #444; }
+        #user-list-btn, #noti-toggle-btn { background: #333; color: #fff; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+        #user-list-btn:hover, #noti-toggle-btn:hover { background: #444; }
 
         .chat-messages-wrapper { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -130,7 +131,7 @@
         #scroll-bottom-btn { display: none; position: absolute; bottom: 15px; right: 15px; background: #ffffff; color: #333; border: 1px solid #ccc; width: 36px; height: 36px; border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; justify-content: center; align-items: center; }
         #scroll-bottom-btn:hover { background: #f0f0f0; }
 
-        /* 화면 공유 시청 모달 */
+        /* 화면 공유 전체화면 뷰어 모달 */
         #screen-viewer-modal {
             display: none;
             position: fixed;
@@ -205,7 +206,7 @@
         /* Dark Mode Overrides */
         .container.dark-mode { background-color: #18191a !important; color: #e4e6eb !important; }
         .container.dark-mode .chat-header { background-color: #242526 !important; color: #e4e6eb !important; }
-        .container.dark-mode #user-list-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
+        .container.dark-mode #user-list-btn, .container.dark-mode #noti-toggle-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
         .container.dark-mode .chat-messages { background-color: #18191a !important; }
         .container.dark-mode .other .bubble { background-color: #242526 !important; color: #e4e6eb !important; }
         .container.dark-mode .mine .bubble { background-color: #d29922 !important; color: #000 !important; }
@@ -259,7 +260,10 @@
         <div id="chat-screen">
             <div class="chat-header">
                 <span id="room-title" onclick="handleTitleClick()" style="cursor: pointer;">1-1 채팅</span>
-                <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
+                <div class="header-btn-group">
+                    <button id="noti-toggle-btn" onclick="toggleNotification()">🔔 알림 켜짐</button>
+                    <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
+                </div>
             </div>
             
             <div class="chat-messages-wrapper">
@@ -354,6 +358,9 @@
         let isDarkMode = false;
         let cachedMembers = [];
 
+        // 알림 기능 변수
+        let isNotificationEnabled = (localStorage.getItem('chat_noti_enabled') !== 'false');
+
         // WebRTC 화면 공유 변수
         let localScreenStream = null;
         let peerConnections = {}; 
@@ -363,6 +370,65 @@
         };
 
         const AVAILABLE_REACTIONS = ['❤️', '👍', '✅', '😄', '😢', '🔥'];
+
+        // ================= 웹 알림 제어 로직 =================
+        function updateNotiButtonUI() {
+            const btn = document.getElementById('noti-toggle-btn');
+            if (btn) {
+                btn.innerText = isNotificationEnabled ? '🔔 알림 켜짐' : '🔕 알림 꺼짐';
+                btn.style.opacity = isNotificationEnabled ? '1' : '0.6';
+            }
+        }
+
+        async function toggleNotification() {
+            if (!("Notification" in window)) {
+                alert('현재 브라우저는 웹 알림을 지원하지 않습니다.');
+                return;
+            }
+
+            if (!isNotificationEnabled) {
+                // 알림을 켜는 경우 권한 확인 및 요청
+                if (Notification.permission === 'default') {
+                    const permission = await Notification.requestPermission();
+                    if (permission !== 'granted') {
+                        alert('브라우저 설정에서 알림 권한을 허용해야 알림을 받을 수 있습니다.');
+                        return;
+                    }
+                } else if (Notification.permission === 'denied') {
+                    alert('브라우저에서 알림이 차단되어 있습니다. 브라우저 주소창 왼쪽 자물쇠 아이콘에서 알림을 허용해주세요.');
+                    return;
+                }
+                isNotificationEnabled = true;
+            } else {
+                // 알림 끄기
+                isNotificationEnabled = false;
+            }
+
+            localStorage.setItem('chat_noti_enabled', isNotificationEnabled ? 'true' : 'false');
+            updateNotiButtonUI();
+        }
+
+        function triggerWebNotification(sender, text) {
+            if (!isNotificationEnabled) return;
+            if (!("Notification" in window) || Notification.permission !== 'granted') return;
+
+            // 내가 보낸 메시지거나 현재 창을 직접 보고 있으면 푸시 팝업 생략
+            if (sender === myUsername) return;
+            if (document.visibilityState === 'visible' && document.hasFocus()) return;
+
+            const title = `${sender} 님의 메시지`;
+            const options = {
+                body: text || '[사진]',
+                icon: '/favicon.ico', // 기본 파비콘
+                tag: 'chat-new-msg'
+            };
+
+            const noti = new Notification(title, options);
+            noti.onclick = () => {
+                window.focus();
+                noti.close();
+            };
+        }
 
         // + 버튼 팝업 토글
         function toggleAttachMenu(e) {
@@ -400,7 +466,6 @@
                 isSharingScreen = true;
                 socket.emit('start_screen_share');
 
-                // 사용자가 브라우저 상단 "공유 중지" 버튼을 직접 클릭했을 때 처리
                 localScreenStream.getVideoTracks()[0].onended = () => {
                     stopScreenShare();
                 };
@@ -426,7 +491,6 @@
             socket.emit('stop_screen_share');
         }
 
-        // 시청자: '보기' 버튼 클릭 시 연결 요청
         function viewScreenShare(sharerUsername) {
             document.getElementById('screen-viewer-title').innerText = `${sharerUsername} 님의 화면 공유`;
             document.getElementById('screen-viewer-modal').style.display = 'flex';
@@ -439,7 +503,7 @@
             video.srcObject = null;
         }
 
-        // ================= 기존 UI 및 소켓 로직 =================
+        // ================= 기본 UI 및 소켓 로직 =================
         function handleTitleClick() {
             titleClickCount++;
             if (titleClickCount >= 10) {
@@ -496,6 +560,7 @@
                 myUsername = username;
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('chat-screen').style.display = 'flex';
+                updateNotiButtonUI();
                 initSocket();
             } else {
                 document.getElementById('auth-error').innerText = data.message;
@@ -525,6 +590,9 @@
                     if (oldReadEl) oldReadEl.remove();
                 }
                 appendMessage(data, true, true);
+
+                // 웹 알림 발생
+                triggerWebNotification(data.username, data.message || (data.image ? '[사진]' : ''));
             });
 
             socket.on('message_read_updated', ({ messageId, readBy }) => {
@@ -597,8 +665,7 @@
                 }
             });
 
-            // ================= WebRTC 소켓 시그널링 수신 =================
-            // 1. 공유자 입장: 새 시청자가 입장함 -> Offer 전송
+            // WebRTC 시그널링
             socket.on('screen_viewer_joined', async ({ viewerSocketId }) => {
                 if (!isSharingScreen || !localScreenStream) return;
                 const pc = new RTCPeerConnection(rtcConfig);
@@ -625,7 +692,6 @@
                 });
             });
 
-            // 2. 시청자 입장: 공유자로부터 Offer 도착 -> Answer 생성 후 전송
             socket.on('screen_offer_received', async ({ sharerSocketId, offer }) => {
                 const pc = new RTCPeerConnection(rtcConfig);
                 peerConnections[sharerSocketId] = pc;
@@ -656,7 +722,6 @@
                 });
             });
 
-            // 3. 공유자 입장: 시청자의 Answer 도착
             socket.on('screen_answer_received', async ({ viewerSocketId, answer }) => {
                 const pc = peerConnections[viewerSocketId];
                 if (pc) {
@@ -664,7 +729,6 @@
                 }
             });
 
-            // 4. 공통 ICE 후보 교환
             socket.on('screen_ice_candidate_received', async ({ senderSocketId, candidate }) => {
                 const pc = peerConnections[senderSocketId];
                 if (pc) {
@@ -676,7 +740,6 @@
                 }
             });
 
-            // 5. 화면 공유 종료 알림 수신 시 뷰어 닫기
             socket.on('screen_share_closed', () => {
                 closeScreenViewer();
             });
@@ -884,14 +947,12 @@
             document.getElementById('reply-preview-bar').style.display = 'none';
         }
 
-        // 답장 클릭 시 원본 메시지로 이동 및 하이라이트
         function jumpToOriginalMessage(targetId, targetUsername, targetText) {
             let targetEl = null;
             if (targetId) {
                 targetEl = document.getElementById(`msg-${targetId}`);
             }
             if (!targetEl) {
-                // 이전 데이터 호환: 텍스트 및 유저 매칭
                 const allBoxes = document.querySelectorAll('.message-box');
                 for (let box of allBoxes) {
                     if (box.dataset.username === targetUsername && 
@@ -905,7 +966,7 @@
             if (targetEl) {
                 targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 targetEl.classList.remove('highlight-target');
-                void targetEl.offsetWidth; // 리플로우 트리거
+                void targetEl.offsetWidth;
                 targetEl.classList.add('highlight-target');
             } else {
                 alert('원본 메시지를 찾을 수 없거나 이미 삭제되었습니다.');
@@ -1102,7 +1163,6 @@
                 box.appendChild(nameDiv);
             }
 
-            // 답장 인용 표시 (클릭 시 원본 이동)
             if (data.replyTo) {
                 const quoteDiv = document.createElement('div');
                 quoteDiv.className = 'reply-quote';
@@ -1119,7 +1179,6 @@
                 bubble.className = 'bubble';
                 bubble.innerHTML = formatMessageText(data.message);
 
-                // 화면 공유 알림 메시지일 경우 [보기] 또는 [중지] 버튼 추가
                 if (data.isScreenShareNotice && data.screenSharer) {
                     const btnContainer = document.createElement('div');
                     if (data.screenSharer === myUsername) {
