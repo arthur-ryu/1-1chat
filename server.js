@@ -24,6 +24,9 @@ const ipFilteredUsers = new Set();
 // 유저별 최근 접속 IP 매핑 (username -> IP)
 const userIpMap = new Map();
 
+// 화면 공유 세션 상태 (현재 공유 중인 유저의 소켓 정보)
+let currentScreenSharer = null; // { username, socketId }
+
 async function startServer() {
     try {
         const client = new MongoClient(mongoURI);
@@ -126,7 +129,7 @@ function getKSTDateString(date = new Date()) {
 }
 
 // 봇 메시지 브로드캐스트 및 DB 저장 유틸 함수
-async function sendBotMessage(text) {
+async function sendBotMessage(text, extraData = {}) {
     const now = new Date();
     const timeString = now.toLocaleTimeString('ko-KR', {
         timeZone: 'Asia/Seoul',
@@ -142,7 +145,8 @@ async function sendBotMessage(text) {
         image: null,
         replyTo: null,
         createdAt: now,
-        readBy: ['bot']
+        readBy: ['bot'],
+        ...extraData
     };
 
     try {
@@ -174,7 +178,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
             helpLines.push('• /unkick @유저이름 : 킥된 유저의 추방 해제');
             helpLines.push('• /klist : 킥된 유저 목록');
             helpLines.push('• /alldel [답장 필수] : 답장한 메시지부터 그 아래 모든 메시지 삭제');
-            helpLines.push('• /ip : IP 확인');
+            helpLines.push('• /ip : 실시간 접속자 IP 확인');
             helpLines.push('• /ip필터링 @유저이름 : 해당 유저의 IP(필터) 토글');
             helpLines.push('• /ip필터목록 : IP 필터링 등록된 유저 목록');
         }
@@ -182,7 +186,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
         return true;
     }
 
-    // --- admin 전용 명령어: /kick (답장 또는 @닉네임 지원) ---
+    // --- admin 전용 명령어: /kick ---
     if (cmd.startsWith('/kick')) {
         if (senderUsername !== 'admin') {
             await sendBotMessage(`⚠️ /kick 명령어는 관리자 계정만 사용할 수 있습니다.`);
@@ -199,7 +203,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
         }
 
         if (!target) {
-            await sendBotMessage(`⚠️ 킥할 유저 닉네임을 입력하거나 대상 유저의 메시지에 답장해주세요. 예) /kick @김은아`);
+            await sendBotMessage(`⚠️ 킥할 유저 닉네임을 입력하거나 대상 유저의 메시지에 답장해주세요. 예) /kick @유저이름`);
             return true;
         }
 
@@ -231,7 +235,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
         const target = rawTarget.replace(/^@/, '').trim();
 
         if (!target) {
-            await sendBotMessage(`⚠️ 킥 해제할 유저 닉네임을 입력해주세요. 예) /unkick @김은아`);
+            await sendBotMessage(`⚠️ 킥 해제할 유저 닉네임을 입력해주세요. 예) /unkick @유저이름`);
             return true;
         }
 
@@ -272,14 +276,19 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
         }
 
         try {
-            const query = { username: replyToData.username };
-            if (replyToData.text === '[이미지]') {
-                query.image = { $ne: null };
-            } else {
-                query.message = replyToData.text;
+            let targetMsg = null;
+            if (replyToData.targetId) {
+                targetMsg = await db.collection('messages').findOne({ _id: new ObjectId(replyToData.targetId) });
             }
-
-            const targetMsg = await db.collection('messages').findOne(query, { sort: { _id: -1 } });
+            if (!targetMsg) {
+                const query = { username: replyToData.username };
+                if (replyToData.text === '[이미지]') {
+                    query.image = { $ne: null };
+                } else {
+                    query.message = replyToData.text;
+                }
+                targetMsg = await db.collection('messages').findOne(query, { sort: { _id: -1 } });
+            }
 
             if (!targetMsg) {
                 await sendBotMessage(`⚠️ 기준 메시지를 DB에서 찾을 수 없습니다.`);
@@ -306,14 +315,13 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
         return true;
     }
 
-    // --- admin 전용 명령어: /ip (실시간 접속 유저 IP 전체 출력) ---
+    // --- admin 전용 명령어: /ip ---
     if (cmd === '/ip') {
         if (senderUsername !== 'admin') {
             await sendBotMessage(`⚠️ /ip 명령어는 관리자 계정만 사용할 수 있습니다.`);
             return true;
         }
 
-        // 현재 실시간 접속(온라인) 중인 유저 명단 추출 (중복 제거)
         const activeUsers = Array.from(new Set(Object.values(onlineUsers)));
 
         if (activeUsers.length === 0) {
@@ -348,7 +356,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
         const target = rawTarget.replace(/^@/, '').trim();
 
         if (!target) {
-            await sendBotMessage(`⚠️ 필터링할 유저 닉네임을 입력해주세요. 예) /ip필터링 @김은아`);
+            await sendBotMessage(`⚠️ 필터링할 유저 닉네임을 입력해주세요. 예) /ip필터링 @유저이름`);
             return true;
         }
 
@@ -580,7 +588,6 @@ io.on('connection', async (socket) => {
             messageData._id = result.insertedId;
             emitToActiveUsers('receive_message', messageData);
 
-            // 봇 명령어 감지
             if (data.message && data.message.startsWith('/')) {
                 await handleBotCommands(data.message, data.username, data.replyTo);
             }
@@ -589,7 +596,55 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // 2. 읽음 표시 처리
+    // 2. 화면 공유 시그널링 (WebRTC)
+    socket.on('start_screen_share', async () => {
+        if (kickedUsers.has(username)) return;
+        currentScreenSharer = { username, socketId: socket.id };
+        await sendBotMessage(`📢 @${username} 님이 화면 공유를 시작하였습니다.`, {
+            isScreenShareNotice: true,
+            screenSharer: username
+        });
+    });
+
+    socket.on('stop_screen_share', async () => {
+        if (currentScreenSharer && currentScreenSharer.socketId === socket.id) {
+            const sharerName = currentScreenSharer.username;
+            currentScreenSharer = null;
+            emitToActiveUsers('screen_share_closed');
+            await sendBotMessage(`🛑 @${sharerName} 님의 화면 공유가 중지되었습니다.`);
+        }
+    });
+
+    socket.on('request_join_screen', () => {
+        if (currentScreenSharer) {
+            io.to(currentScreenSharer.socketId).emit('screen_viewer_joined', {
+                viewerSocketId: socket.id
+            });
+        }
+    });
+
+    socket.on('screen_offer', ({ viewerSocketId, offer }) => {
+        io.to(viewerSocketId).emit('screen_offer_received', {
+            sharerSocketId: socket.id,
+            offer
+        });
+    });
+
+    socket.on('screen_answer', ({ sharerSocketId, answer }) => {
+        io.to(sharerSocketId).emit('screen_answer_received', {
+            viewerSocketId: socket.id,
+            answer
+        });
+    });
+
+    socket.on('screen_ice_candidate', ({ targetSocketId, candidate }) => {
+        io.to(targetSocketId).emit('screen_ice_candidate_received', {
+            senderSocketId: socket.id,
+            candidate
+        });
+    });
+
+    // 3. 읽음 표시 처리
     socket.on('mark_read', async (messageId) => {
         if (!username || kickedUsers.has(username)) return;
         try {
@@ -608,7 +663,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // 3. 메시지 삭제
+    // 4. 메시지 삭제
     socket.on('delete_message', async (messageId) => {
         if (kickedUsers.has(username)) return;
         try {
@@ -623,7 +678,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // 4. 이모지 공감 반응
+    // 5. 이모지 반응
     socket.on('toggle_reaction', async ({ messageId, emoji }) => {
         if (!username || kickedUsers.has(username)) return;
         try {
@@ -631,9 +686,7 @@ io.on('connection', async (socket) => {
             const msg = await db.collection('messages').findOne({ _id: id });
             if (!msg) return;
 
-            if (!msg.reactions) {
-                msg.reactions = {};
-            }
+            if (!msg.reactions) msg.reactions = {};
 
             let existingEmojiFound = null;
             for (const [key, users] of Object.entries(msg.reactions)) {
@@ -645,22 +698,14 @@ io.on('connection', async (socket) => {
 
             if (existingEmojiFound === emoji) {
                 msg.reactions[emoji] = msg.reactions[emoji].filter(u => u !== username);
-                if (msg.reactions[emoji].length === 0) {
-                    delete msg.reactions[emoji];
-                }
+                if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
             } else {
                 if (existingEmojiFound) {
                     msg.reactions[existingEmojiFound] = msg.reactions[existingEmojiFound].filter(u => u !== username);
-                    if (msg.reactions[existingEmojiFound].length === 0) {
-                        delete msg.reactions[existingEmojiFound];
-                    }
+                    if (msg.reactions[existingEmojiFound].length === 0) delete msg.reactions[existingEmojiFound];
                 }
-                if (!msg.reactions[emoji]) {
-                    msg.reactions[emoji] = [];
-                }
-                if (!msg.reactions[emoji].includes(username)) {
-                    msg.reactions[emoji].push(username);
-                }
+                if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+                if (!msg.reactions[emoji].includes(username)) msg.reactions[emoji].push(username);
             }
 
             await db.collection('messages').updateOne(
@@ -674,7 +719,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // 5. 타이핑 알림
+    // 6. 타이핑 감지
     socket.on('typing', async (isTyping) => {
         if (kickedUsers.has(username)) return;
         if (username) {
@@ -691,7 +736,16 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // 7. 연결 종료
     socket.on('disconnect', async () => {
+        // 화면 공유 진행자가 나가면 화면 공유 강제 종료 알림
+        if (currentScreenSharer && currentScreenSharer.socketId === socket.id) {
+            const sharerName = currentScreenSharer.username;
+            currentScreenSharer = null;
+            emitToActiveUsers('screen_share_closed');
+            sendBotMessage(`🛑 @${sharerName} 님이 접속을 종료하여 화면 공유가 중지되었습니다.`);
+        }
+
         if (onlineUsers[socket.id]) {
             const leftUser = onlineUsers[socket.id];
             await db.collection('users').updateOne(
