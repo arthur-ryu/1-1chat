@@ -33,7 +33,7 @@
         .chat-messages-wrapper { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         
-        .message-box { display: flex; flex-direction: column; max-width: 75%; cursor: pointer; position: relative; }
+        .message-box { display: flex; flex-direction: column; max-width: 75%; cursor: pointer; position: relative; transition: background-color 0.3s ease; }
         .message-box.mine { align-self: flex-end; align-items: flex-end; }
         .message-box.other { align-self: flex-start; align-items: flex-start; }
         .sender-name { font-size: 11px; color: #555; margin-bottom: 3px; }
@@ -49,36 +49,71 @@
         .mine .read-status { align-self: flex-end; }
         .other .read-status { align-self: flex-start; }
 
-        .reply-quote { background: rgba(0,0,0,0.06); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #444; margin-bottom: 4px; border-left: 3px solid #3c1e1e; }
+        .reply-quote { background: rgba(0,0,0,0.06); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #444; margin-bottom: 4px; border-left: 3px solid #3c1e1e; cursor: pointer; user-select: none; }
+        .reply-quote:hover { background: rgba(0,0,0,0.12); }
         .chat-image { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 4px; display: block; }
 
-        /* Reactions under message */
-        .reaction-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-top: 4px;
+        /* 답장 클릭 하이라이트 애니메이션 */
+        @keyframes highlightFlash {
+            0% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.03); filter: brightness(1.2); }
+            100% { transform: scale(1); filter: brightness(1); }
         }
-        .mine .reaction-container { justify-content: flex-end; }
-        .other .reaction-container { justify-content: flex-start; }
+        .highlight-target { animation: highlightFlash 0.7s ease-in-out; }
 
-        .reaction-badge {
+        /* 화면 공유 버튼 뱃지 */
+        .screen-share-btn {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 5px 12px;
+            background: #1877f2;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .screen-share-btn.stop { background: #d9534f; }
+        .screen-share-btn:hover { opacity: 0.9; }
+
+        /* + 첨부 메뉴 팝업 */
+        #attach-menu-dropdown {
+            display: none;
+            position: absolute;
+            bottom: 60px;
+            left: 10px;
             background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            padding: 2px 6px;
-            font-size: 11px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            z-index: 50;
+            overflow: hidden;
+            flex-direction: column;
+            width: 140px;
+        }
+        .attach-menu-item {
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 3px;
-            cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            user-select: none;
+            gap: 8px;
+            border-bottom: 1px solid #f0f0f0;
         }
-        .reaction-badge.my-reaction {
-            background: #eef3fc;
-            border-color: #1877f2;
-        }
+        .attach-menu-item:last-child { border-bottom: none; }
+        .attach-menu-item:hover { background: #f5f5f5; }
+
+        /* Reactions under message */
+        .reaction-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .mine .reaction-container { justify-content: flex-end; }
+        .other .reaction-container { justify-content: flex-start; }
+        .reaction-badge { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 2px 6px; font-size: 11px; display: flex; align-items: center; gap: 3px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none; }
+        .reaction-badge.my-reaction { background: #eef3fc; border-color: #1877f2; }
 
         .chat-input-area { padding: 10px; background-color: #f0f0f0; display: flex; flex-direction: column; gap: 6px; position: relative; }
         .input-row { display: flex; gap: 8px; align-items: center; width: 100%; }
@@ -89,60 +124,56 @@
 
         #reply-preview-bar { display: none; justify-content: space-between; align-items: center; background: #e4dfd5; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: #333; }
         #reply-preview-bar button { background: none; border: none; font-weight: bold; cursor: pointer; color: #777; }
-
         #typing-notice { font-size: 11px; color: #666; padding: 0 4px; min-height: 16px; }
 
-        #new-message-banner {
-            display: none;
-            position: absolute;
-            bottom: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(31, 31, 31, 0.9);
-            color: #fff;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            z-index: 10;
-            white-space: nowrap;
-            max-width: 90%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            align-items: center;
-            gap: 6px;
-        }
+        #new-message-banner { display: none; position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(31, 31, 31, 0.9); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; align-items: center; gap: 6px; }
+        #scroll-bottom-btn { display: none; position: absolute; bottom: 15px; right: 15px; background: #ffffff; color: #333; border: 1px solid #ccc; width: 36px; height: 36px; border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; justify-content: center; align-items: center; }
+        #scroll-bottom-btn:hover { background: #f0f0f0; }
 
-        #scroll-bottom-btn {
+        /* 화면 공유 시청 모달 */
+        #screen-viewer-modal {
             display: none;
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
-            background: #ffffff;
-            color: #333;
-            border: 1px solid #ccc;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            z-index: 10;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.92);
+            z-index: 999;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
         }
-        #scroll-bottom-btn:hover { background: #f0f0f0; }
+        .screen-viewer-header {
+            width: 100%;
+            padding: 12px 20px;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.4);
+            position: absolute;
+            top: 0;
+        }
+        #screen-video-element {
+            max-width: 95vw;
+            max-height: 85vh;
+            border-radius: 8px;
+            background: #000;
+        }
+        .viewer-close-btn {
+            background: #d9534f;
+            border: none;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
         #user-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 20; }
         .modal-content { background: #fff; width: 85%; max-width: 300px; height: 75%; max-height: 400px; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         .modal-scroll-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
-        
         .modal-section-title { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
         .modal-user-list { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #444; }
         .modal-user-list li { padding: 6px 8px; background: #f9f9f9; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-        
         .user-name-span { display: flex; align-items: center; gap: 6px; }
         .online-dot::before { content: "●"; color: #2ecc71; font-size: 10px; }
         .offline-dot::before { content: "●"; color: #bbb; font-size: 10px; }
@@ -151,56 +182,22 @@
 
         #chat-menu-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); justify-content: center; align-items: center; z-index: 30; }
         .chat-menu-content { background: #fff; width: 220px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
-        
-        /* Reaction quick-pick tray inside context menu */
-        .reaction-pick-tray {
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 8px;
-            background: #f7f7f7;
-            border-bottom: 1px solid #eee;
-        }
-        .reaction-pick-item {
-            font-size: 20px;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
+        .reaction-pick-tray { display: flex; justify-content: space-around; padding: 10px 8px; background: #f7f7f7; border-bottom: 1px solid #eee; }
+        .reaction-pick-item { font-size: 20px; cursor: pointer; transition: transform 0.1s; }
         .reaction-pick-item:hover { transform: scale(1.2); }
-
         .chat-menu-item { padding: 12px; text-align: center; border-bottom: 1px solid #eee; background: none; border: none; font-size: 14px; cursor: pointer; font-weight: bold; color: #333; }
         .chat-menu-item:last-child { border-bottom: none; }
         .chat-menu-item:hover { background: #f5f5f5; }
         .chat-menu-item.delete { color: #d9534f; }
 
-        /* Reaction details tooltip / modal */
         #reaction-detail-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); justify-content: center; align-items: center; z-index: 40; }
         .reaction-detail-content { background: #fff; width: 200px; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         .reaction-detail-title { font-size: 12px; font-weight: bold; color: #555; border-bottom: 1px solid #eee; padding-bottom: 4px; display: flex; align-items: center; gap: 4px; }
         .reaction-detail-list { font-size: 13px; color: #333; list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; }
         .reaction-detail-list li { padding: 4px 6px; background: #f9f9f9; border-radius: 4px; display: flex; justify-content: space-between; }
 
-        /* Mention Dropdown */
-        #mention-dropdown {
-            display: none;
-            position: absolute;
-            bottom: 100%;
-            left: 10px;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            max-height: 130px;
-            overflow-y: auto;
-            z-index: 40;
-            width: 180px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        }
-        .mention-item {
-            padding: 8px 12px;
-            font-size: 13px;
-            cursor: pointer;
-            color: #333;
-            border-bottom: 1px solid #eee;
-        }
+        #mention-dropdown { display: none; position: absolute; bottom: 100%; left: 10px; background: #fff; border: 1px solid #ccc; border-radius: 4px; max-height: 130px; overflow-y: auto; z-index: 40; width: 180px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .mention-item { padding: 8px 12px; font-size: 13px; cursor: pointer; color: #333; border-bottom: 1px solid #eee; }
         .mention-item:last-child { border-bottom: none; }
         .mention-item:hover { background: #f0f0f0; }
         .mention-highlight { color: #0066ff; font-weight: bold; }
@@ -236,6 +233,9 @@
         .container.dark-mode #mention-dropdown { background: #242526 !important; border-color: #3a3b3c !important; }
         .container.dark-mode .mention-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
         .container.dark-mode .mention-item:hover { background: #3a3b3c !important; }
+        .container.dark-mode #attach-menu-dropdown { background: #242526 !important; }
+        .container.dark-mode .attach-menu-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
+        .container.dark-mode .attach-menu-item:hover { background: #3a3b3c !important; }
     </style>
 </head>
 <body>
@@ -273,13 +273,20 @@
 
             <div class="chat-input-area">
                 <div id="mention-dropdown"></div>
+
+                <!-- + 버튼 클릭 팝업 메뉴 -->
+                <div id="attach-menu-dropdown">
+                    <button class="attach-menu-item" onclick="triggerFileInput()">🖼️ 사진 전송</button>
+                    <button class="attach-menu-item" onclick="startScreenShare()">💻 화면 공유</button>
+                </div>
+
                 <div id="reply-preview-bar">
                     <span id="reply-preview-text"></span>
                     <button onclick="cancelReply()">✕</button>
                 </div>
                 <div id="typing-notice"></div>
                 <div class="input-row">
-                    <button class="btn-attach" onclick="document.getElementById('image-input').click()">+</button>
+                    <button class="btn-attach" onclick="toggleAttachMenu(event)">+</button>
                     <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="sendImage(this)">
                     
                     <textarea id="message-input" placeholder="메시지를 입력하세요..." oninput="handleMessageInput()" onkeydown="handleKeyDown(event)"></textarea>
@@ -323,6 +330,15 @@
                     <ul id="reaction-detail-list" class="reaction-detail-list"></ul>
                 </div>
             </div>
+
+            <!-- 화면 공유 전체화면 뷰어 모달 -->
+            <div id="screen-viewer-modal">
+                <div class="screen-viewer-header">
+                    <span id="screen-viewer-title" style="font-weight:bold;">화면 공유 시청 중</span>
+                    <button class="viewer-close-btn" onclick="closeScreenViewer()">닫기</button>
+                </div>
+                <video id="screen-video-element" autoplay playsinline></video>
+            </div>
         </div>
     </div>
 
@@ -338,8 +354,92 @@
         let isDarkMode = false;
         let cachedMembers = [];
 
+        // WebRTC 화면 공유 변수
+        let localScreenStream = null;
+        let peerConnections = {}; 
+        let isSharingScreen = false;
+        const rtcConfig = {
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        };
+
         const AVAILABLE_REACTIONS = ['❤️', '👍', '✅', '😄', '😢', '🔥'];
 
+        // + 버튼 팝업 토글
+        function toggleAttachMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('attach-menu-dropdown');
+            menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('attach-menu-dropdown');
+            if (menu && !menu.contains(e.target) && !e.target.classList.contains('btn-attach')) {
+                menu.style.display = 'none';
+            }
+        });
+
+        function triggerFileInput() {
+            document.getElementById('attach-menu-dropdown').style.display = 'none';
+            document.getElementById('image-input').click();
+        }
+
+        // ================= WebRTC 화면 공유 로직 =================
+        async function startScreenShare() {
+            document.getElementById('attach-menu-dropdown').style.display = 'none';
+            if (isSharingScreen) {
+                alert('이미 화면 공유를 진행 중입니다.');
+                return;
+            }
+
+            try {
+                localScreenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: 'always' },
+                    audio: false
+                });
+
+                isSharingScreen = true;
+                socket.emit('start_screen_share');
+
+                // 사용자가 브라우저 상단 "공유 중지" 버튼을 직접 클릭했을 때 처리
+                localScreenStream.getVideoTracks()[0].onended = () => {
+                    stopScreenShare();
+                };
+            } catch (err) {
+                console.error('화면 공유 권한 거부 또는 실패:', err);
+            }
+        }
+
+        function stopScreenShare() {
+            if (!isSharingScreen) return;
+            isSharingScreen = false;
+
+            if (localScreenStream) {
+                localScreenStream.getTracks().forEach(track => track.stop());
+                localScreenStream = null;
+            }
+
+            for (let socketId in peerConnections) {
+                peerConnections[socketId].close();
+            }
+            peerConnections = {};
+
+            socket.emit('stop_screen_share');
+        }
+
+        // 시청자: '보기' 버튼 클릭 시 연결 요청
+        function viewScreenShare(sharerUsername) {
+            document.getElementById('screen-viewer-title').innerText = `${sharerUsername} 님의 화면 공유`;
+            document.getElementById('screen-viewer-modal').style.display = 'flex';
+            socket.emit('request_join_screen');
+        }
+
+        function closeScreenViewer() {
+            document.getElementById('screen-viewer-modal').style.display = 'none';
+            const video = document.getElementById('screen-video-element');
+            video.srcObject = null;
+        }
+
+        // ================= 기존 UI 및 소켓 로직 =================
         function handleTitleClick() {
             titleClickCount++;
             if (titleClickCount >= 10) {
@@ -495,6 +595,90 @@
                 } else {
                     noticeEl.innerText = `${otherTyping[0]}님 외 ${otherTyping.length - 1}명이 입력 중입니다...`;
                 }
+            });
+
+            // ================= WebRTC 소켓 시그널링 수신 =================
+            // 1. 공유자 입장: 새 시청자가 입장함 -> Offer 전송
+            socket.on('screen_viewer_joined', async ({ viewerSocketId }) => {
+                if (!isSharingScreen || !localScreenStream) return;
+                const pc = new RTCPeerConnection(rtcConfig);
+                peerConnections[viewerSocketId] = pc;
+
+                localScreenStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localScreenStream);
+                });
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('screen_ice_candidate', {
+                            targetSocketId: viewerSocketId,
+                            candidate: event.candidate
+                        });
+                    }
+                };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('screen_offer', {
+                    viewerSocketId,
+                    offer
+                });
+            });
+
+            // 2. 시청자 입장: 공유자로부터 Offer 도착 -> Answer 생성 후 전송
+            socket.on('screen_offer_received', async ({ sharerSocketId, offer }) => {
+                const pc = new RTCPeerConnection(rtcConfig);
+                peerConnections[sharerSocketId] = pc;
+
+                pc.ontrack = (event) => {
+                    const video = document.getElementById('screen-video-element');
+                    if (event.streams && event.streams[0]) {
+                        video.srcObject = event.streams[0];
+                    }
+                };
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('screen_ice_candidate', {
+                            targetSocketId: sharerSocketId,
+                            candidate: event.candidate
+                        });
+                    }
+                };
+
+                await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                socket.emit('screen_answer', {
+                    sharerSocketId,
+                    answer
+                });
+            });
+
+            // 3. 공유자 입장: 시청자의 Answer 도착
+            socket.on('screen_answer_received', async ({ viewerSocketId, answer }) => {
+                const pc = peerConnections[viewerSocketId];
+                if (pc) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                }
+            });
+
+            // 4. 공통 ICE 후보 교환
+            socket.on('screen_ice_candidate_received', async ({ senderSocketId, candidate }) => {
+                const pc = peerConnections[senderSocketId];
+                if (pc) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch (e) {
+                        console.error('ICE 후보 추가 오류:', e);
+                    }
+                }
+            });
+
+            // 5. 화면 공유 종료 알림 수신 시 뷰어 닫기
+            socket.on('screen_share_closed', () => {
+                closeScreenViewer();
             });
         }
 
@@ -688,8 +872,8 @@
             }
         }
 
-        function setReply(username, text) {
-            currentReply = { username, text: text || '[이미지]' };
+        function setReply(username, text, messageId) {
+            currentReply = { username, text: text || '[이미지]', targetId: messageId };
             document.getElementById('reply-preview-text').innerText = `${username}: ${currentReply.text}`;
             document.getElementById('reply-preview-bar').style.display = 'flex';
             document.getElementById('message-input').focus();
@@ -698,6 +882,34 @@
         function cancelReply() {
             currentReply = null;
             document.getElementById('reply-preview-bar').style.display = 'none';
+        }
+
+        // 답장 클릭 시 원본 메시지로 이동 및 하이라이트
+        function jumpToOriginalMessage(targetId, targetUsername, targetText) {
+            let targetEl = null;
+            if (targetId) {
+                targetEl = document.getElementById(`msg-${targetId}`);
+            }
+            if (!targetEl) {
+                // 이전 데이터 호환: 텍스트 및 유저 매칭
+                const allBoxes = document.querySelectorAll('.message-box');
+                for (let box of allBoxes) {
+                    if (box.dataset.username === targetUsername && 
+                       (box.dataset.message === targetText || (targetText === '[이미지]' && box.dataset.image))) {
+                        targetEl = box;
+                        break;
+                    }
+                }
+            }
+
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetEl.classList.remove('highlight-target');
+                void targetEl.offsetWidth; // 리플로우 트리거
+                targetEl.classList.add('highlight-target');
+            } else {
+                alert('원본 메시지를 찾을 수 없거나 이미 삭제되었습니다.');
+            }
         }
 
         function openChatMenu(data) {
@@ -732,7 +944,7 @@
         function actionReply() {
             closeChatMenu();
             if (selectedMessageData) {
-                setReply(selectedMessageData.username, selectedMessageData.message);
+                setReply(selectedMessageData.username, selectedMessageData.message, selectedMessageData._id);
             }
         }
 
@@ -871,7 +1083,7 @@
 
             let pressTimer;
             box.ontouchstart = (e) => {
-                if (e.target.closest('.reaction-badge')) return;
+                if (e.target.closest('.reaction-badge') || e.target.closest('.screen-share-btn')) return;
                 pressTimer = setTimeout(() => {
                     openChatMenu(data);
                 }, 600);
@@ -890,10 +1102,15 @@
                 box.appendChild(nameDiv);
             }
 
+            // 답장 인용 표시 (클릭 시 원본 이동)
             if (data.replyTo) {
                 const quoteDiv = document.createElement('div');
                 quoteDiv.className = 'reply-quote';
                 quoteDiv.innerText = `↳ ${data.replyTo.username}: ${data.replyTo.text}`;
+                quoteDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    jumpToOriginalMessage(data.replyTo.targetId, data.replyTo.username, data.replyTo.text);
+                };
                 box.appendChild(quoteDiv);
             }
 
@@ -901,6 +1118,18 @@
                 const bubble = document.createElement('div');
                 bubble.className = 'bubble';
                 bubble.innerHTML = formatMessageText(data.message);
+
+                // 화면 공유 알림 메시지일 경우 [보기] 또는 [중지] 버튼 추가
+                if (data.isScreenShareNotice && data.screenSharer) {
+                    const btnContainer = document.createElement('div');
+                    if (data.screenSharer === myUsername) {
+                        btnContainer.innerHTML = `<button class="screen-share-btn stop" onclick="stopScreenShare()">🛑 화면 공유 중지</button>`;
+                    } else {
+                        btnContainer.innerHTML = `<button class="screen-share-btn" onclick="viewScreenShare('${data.screenSharer}')">📺 화면 공유 보기</button>`;
+                    }
+                    bubble.appendChild(btnContainer);
+                }
+
                 box.appendChild(bubble);
             }
 
