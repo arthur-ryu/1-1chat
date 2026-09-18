@@ -3,68 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미니게임</title>
+    <title>게임 대기실</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
-        body { background: #0e1118; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .game-wrapper { width: 100%; max-width: 520px; background: #161c28; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; min-height: 90vh; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
+        body { background-color: #abc1d1; display: flex; justify-content: center; align-items: center; height: 100vh; height: 100dvh; }
         
-        .header { padding: 16px; background: #0c1017; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: bold; }
-        .user-tag { color: #69adff; font-size: 13px; }
+        .container { width: 100%; max-width: 480px; height: 100%; max-height: 100vh; background-color: #efeae2; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; }
+        @media (min-width: 481px) {
+            .container { height: 85vh; max-height: 750px; border-radius: 12px; overflow: hidden; }
+        }
 
-        /* 대기실 투표 화면 */
-        #lobby-view { flex: 1; display: flex; flex-direction: column; padding: 20px; justify-content: center; gap: 20px; text-align: center; }
-        .vote-cards { display: flex; gap: 16px; width: 100%; }
-        .vote-card { flex: 1; background: #20293a; border: 2px solid transparent; border-radius: 12px; padding: 24px 12px; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        .vote-card:hover { transform: translateY(-4px); background: #283449; }
-        .vote-card.selected { border-color: #69adff; background: #233554; }
-        .vote-count { font-size: 14px; color: #9da8bd; }
-        .timer-badge { font-size: 24px; font-weight: bold; color: #fee500; }
+        .chat-header { background-color: #1f1f1f; color: #fff; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .user-tag { color: #fee500; font-size: 11px; }
 
-        /* 검은 화면 직업 룰렛 */
+        /* 대기실 투표 뷰 */
+        #lobby-view { flex: 1; display: flex; flex-direction: column; padding: 30px 20px; justify-content: center; align-items: center; gap: 20px; text-align: center; }
+        .vote-cards { display: flex; gap: 14px; width: 100%; max-width: 360px; }
+        .vote-card { flex: 1; background: #fff; border: 2px solid transparent; border-radius: 12px; padding: 24px 10px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .vote-card:hover { transform: translateY(-3px); }
+        .vote-card.selected { border-color: #3c1e1e; background: #fee500; }
+        .vote-count { font-size: 13px; color: #777; font-weight: bold; }
+        .timer-badge { font-size: 20px; font-weight: bold; color: #3c1e1e; background: rgba(0,0,0,0.06); padding: 8px 16px; border-radius: 20px; }
+
+        /* 직업 룰렛 오버레이 */
         #roulette-overlay { position: absolute; inset: 0; background: #000; z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center; }
-        .roulette-box { font-size: 38px; font-weight: bold; color: #fee500; height: 60px; }
-        .roulette-sub { margin-top: 15px; color: #aaa; font-size: 14px; }
+        .roulette-box { font-size: 40px; font-weight: bold; color: #fee500; height: 60px; }
+        .roulette-sub { margin-top: 15px; color: #888; font-size: 13px; }
 
-        /* 마피아 / 헤즈업 인게임 화면 */
-        #ingame-view { flex: 1; display: none; flex-direction: column; height: 100%; }
-        .game-status-bar { padding: 12px 16px; background: #1c2434; font-size: 13px; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .board { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .board-msg { padding: 10px 14px; border-radius: 10px; font-size: 13px; background: #222b3d; max-width: 85%; }
-        .board-msg.system { background: #2e1a1a; color: #ff8e8e; align-self: center; text-align: center; }
-        .board-msg.highlight { background: #1c352d; color: #73f0c1; }
+        /* 인게임 메인 대화창 */
+        #ingame-view { flex: 1; display: none; flex-direction: column; height: 100%; position: relative; overflow: hidden; }
+        .game-status-bar { padding: 10px 16px; background: #e4dfd5; font-size: 12px; font-weight: bold; color: #333; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.05); }
 
-        .action-tray { padding: 14px; background: #0c1017; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 8px; }
-        .action-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-        .game-btn { flex: 1; min-width: 70px; padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: #69adff; color: #07101f; }
-        .game-btn.skip { background: #555; color: #fff; }
-        .game-btn.skill { background: #e056fd; color: #fff; }
-        .game-input-row { display: flex; gap: 6px; }
-        .game-input-row input { flex: 1; padding: 10px; border-radius: 6px; border: none; background: #1c2434; color: #fff; outline: none; }
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .message-box { display: flex; flex-direction: column; max-width: 75%; position: relative; }
+        .message-box.mine { align-self: flex-end; align-items: flex-end; }
+        .message-box.other { align-self: flex-start; align-items: flex-start; }
+        .message-box.system { align-self: center; align-items: center; max-width: 90%; }
+        .sender-name { font-size: 11px; color: #555; margin-bottom: 3px; }
+        
+        .bubble { padding: 10px 14px; border-radius: 12px; font-size: 14px; word-break: break-all; line-height: 1.4; white-space: pre-wrap; }
+        .mine .bubble { background-color: #fee500; color: #000; border-top-right-radius: 2px; }
+        .other .bubble { background-color: #fff; color: #000; border-top-left-radius: 2px; }
+        .system .bubble { background-color: rgba(0,0,0,0.12); color: #333; font-size: 12px; border-radius: 20px; padding: 6px 14px; text-align: center; }
+        .system.secret .bubble { background-color: #3c1e1e; color: #fee500; font-weight: bold; }
+        .time { font-size: 9px; color: #777; margin-top: 2px; }
+
+        /* 하단 액션 버튼 트레이 */
+        .action-tray { padding: 8px 10px; background: #e8e3d8; display: none; flex-wrap: wrap; gap: 6px; border-top: 1px solid rgba(0,0,0,0.05); }
+        .game-btn { flex: 1; min-width: 75px; padding: 8px 10px; border-radius: 6px; border: none; font-weight: bold; font-size: 12px; cursor: pointer; background: #3c1e1e; color: #fff; }
+        .game-btn.skip { background: #777; }
+        .game-btn.skill { background: #e056fd; }
+
+        .chat-input-area { padding: 10px; background-color: #f0f0f0; display: flex; gap: 8px; align-items: center; }
+        .chat-input-area input { flex: 1; padding: 10px; border: none; border-radius: 4px; font-size: 14px; outline: none; height: 38px; }
+        .chat-input-area button { padding: 10px 16px; background-color: #fee500; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; height: 38px; }
     </style>
 </head>
 <body>
 
-    <div class="game-wrapper">
-        <div class="header">
-            <span>🎮 미니게임 허브</span>
+    <div class="container">
+        <div class="chat-header">
+            <span id="room-title">게임 대기실</span>
             <span id="my-name-display" class="user-tag"></span>
         </div>
 
         <!-- 1. 좌/우 투표 대기실 -->
         <div id="lobby-view">
-            <h2>어떤 게임을 할까요?</h2>
-            <p style="color: #9da8bd; font-size: 13px;">투표수가 더 많은 게임으로 자동 시작됩니다.</p>
+            <h2 style="color: #3c1e1e;">게임 선택 투표</h2>
+            <p style="color: #666; font-size: 13px;">투표수가 더 많은 게임으로 시작됩니다.</p>
             
             <div class="vote-cards">
                 <div class="vote-card" id="card-mafia" onclick="castVote('mafia')">
-                    <span style="font-size: 32px;">🕵️‍♂️</span>
+                    <span style="font-size: 34px;">🕵️‍♂️</span>
                     <h3>마피아</h3>
                     <span class="vote-count" id="mafia-count">0표</span>
                 </div>
                 <div class="vote-card" id="card-headsup" onclick="castVote('headsUp')">
-                    <span style="font-size: 32px;">🃏</span>
+                    <span style="font-size: 34px;">🃏</span>
                     <h3>헤즈업</h3>
                     <span class="vote-count" id="headsup-count">0표</span>
                 </div>
@@ -73,27 +89,26 @@
             <div class="timer-badge" id="lobby-timer">10초 대기 중</div>
         </div>
 
-        <!-- 2. 검은 화면 직업 룰렛 오버레이 -->
+        <!-- 2. 직업 룰렛 오버레이 -->
         <div id="roulette-overlay">
             <div class="roulette-box" id="roulette-text">시민</div>
             <div class="roulette-sub">직업을 배정받는 중입니다...</div>
         </div>
 
-        <!-- 3. 인게임 화면 -->
+        <!-- 3. 인게임 메인 뷰 -->
         <div id="ingame-view">
             <div class="game-status-bar">
-                <span id="game-phase-name">페이지 준비 중</span>
-                <span id="game-phase-timer" style="color: #fee500; font-weight: bold;"></span>
+                <span id="game-phase-name">게임 준비 중</span>
+                <span id="game-phase-timer" style="color: #d9534f;"></span>
             </div>
             
-            <div class="board" id="game-board"></div>
+            <div class="chat-messages" id="game-messages"></div>
 
-            <div class="action-tray" id="action-tray">
-                <div class="action-btn-row" id="vote-action-buttons"></div>
-                <div class="game-input-row">
-                    <input type="text" id="game-chat-input" placeholder="메시지 또는 단어 입력..." onkeydown="if(event.key==='Enter') sendGameChat()">
-                    <button class="game-btn" style="flex: 0 0 60px;" onclick="sendGameChat()">전송</button>
-                </div>
+            <div class="action-tray" id="action-tray"></div>
+
+            <div class="chat-input-area">
+                <input type="text" id="game-chat-input" placeholder="대화를 입력하세요..." onkeydown="if(event.key==='Enter') sendGameChat()">
+                <button onclick="sendGameChat()">전송</button>
             </div>
         </div>
     </div>
@@ -105,6 +120,7 @@
 
         const socket = io({ query: { username: myUsername } });
         let myRole = '';
+        let currentGame = null;
 
         function castVote(type) {
             document.querySelectorAll('.vote-card').forEach(c => c.classList.remove('selected'));
@@ -121,168 +137,216 @@
             document.getElementById('lobby-timer').innerText = `${t}초 뒤 시작`;
         });
 
-        socket.on('game_started', ({ game }) => {
+        socket.on('game_started', ({ game, title }) => {
+            currentGame = game;
+            document.getElementById('room-title').innerText = title;
             document.getElementById('lobby-view').style.display = 'none';
             document.getElementById('ingame-view').style.display = 'flex';
         });
 
-        // ================= 마피아 게임 플로우 =================
+        // ================= 마피아 게임 로직 =================
         socket.on('mafia_assigned_role', ({ role }) => {
+            if (currentGame !== 'mafia') return;
             myRole = role;
             const overlay = document.getElementById('roulette-overlay');
             const rText = document.getElementById('roulette-text');
             overlay.style.display = 'flex';
 
             const roles = ['시민', '마피아', '경찰', '의사'];
-            let spinCount = 0;
-            const spin = setInterval(() => {
-                rText.innerText = roles[spinCount % roles.length];
-                spinCount++;
-                if (spinCount > 25) {
-                    clearInterval(spin);
+            let count = 0;
+            const timer = setInterval(() => {
+                rText.innerText = roles[count % roles.length];
+                count++;
+                if (count > 25) {
+                    clearInterval(timer);
                     rText.innerText = `당신의 직업: ${role}`;
-                    setTimeout(() => {
-                        overlay.style.display = 'none';
-                    }, 2500);
+                    setTimeout(() => overlay.style.display = 'none', 2500);
                 }
             }, 100);
         });
 
         socket.on('mafia_turn_intro', ({ currentSpeaker, index, total }) => {
+            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = `자기소개 페이즈 (${index + 1}/${total})`;
-            addBoardMsg(`📢 [자기소개] @${currentSpeaker} 님의 턴입니다.`, 'highlight');
+            appendSystemMessage(`📢 [자기소개] @${currentSpeaker} 님의 턴입니다.`);
 
-            const tray = document.getElementById('vote-action-buttons');
+            const tray = document.getElementById('action-tray');
             tray.innerHTML = '';
             if (currentSpeaker === myUsername) {
-                tray.innerHTML = `<button class="game-btn" onclick="finishMyIntro()">자기소개 완료</button>`;
+                tray.style.display = 'flex';
+                tray.innerHTML = `<button class="game-btn" onclick="finishIntro()">자기소개 마치기</button>`;
+            } else {
+                tray.style.display = 'none';
             }
         });
 
-        function finishMyIntro() {
-            document.getElementById('vote-action-buttons').innerHTML = '';
+        function finishIntro() {
+            document.getElementById('action-tray').style.display = 'none';
             socket.emit('mafia_intro_finish');
         }
 
         socket.on('mafia_day_talk_start', () => {
+            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = '자유 토론';
-            addBoardMsg(`☀️ 20초간 자유 토론이 시작되었습니다! 의심되는 사람을 토론하세요.`, 'system');
+            document.getElementById('action-tray').style.display = 'none';
+            appendSystemMessage('☀️ 20초간 자유 토론이 시작되었습니다!');
         });
 
         socket.on('mafia_vote_phase_start', ({ candidates }) => {
-            document.getElementById('game-phase-name').innerText = '처형 투표 페이즈';
-            addBoardMsg(`🗳️ 투표가 시작되었습니다! 의심되는 대상 또는 스킵을 누르세요.`, 'system');
+            if (currentGame !== 'mafia') return;
+            document.getElementById('game-phase-name').innerText = '처형 투표';
+            appendSystemMessage('🗳️ 의심되는 사람에게 투표하세요. (skip 가능)');
 
-            const tray = document.getElementById('vote-action-buttons');
+            const tray = document.getElementById('action-tray');
             tray.innerHTML = '';
+            tray.style.display = 'flex';
             candidates.forEach(u => {
-                tray.innerHTML += `<button class="game-btn" onclick="castMafiaVote('${u}')">${u}</button>`;
+                tray.innerHTML += `<button class="game-btn" onclick="voteTarget('${u}')">${u}</button>`;
             });
-            tray.innerHTML += `<button class="game-btn skip" onclick="castMafiaVote('skip')">스킵(건너뛰기)</button>`;
+            tray.innerHTML += `<button class="game-btn skip" onclick="voteTarget('skip')">스킵(건너뛰기)</button>`;
         });
 
-        function castMafiaVote(target) {
-            document.getElementById('vote-action-buttons').innerHTML = `<span style="color:#aaa;font-size:12px;">투표 완료: ${target}</span>`;
+        function voteTarget(target) {
+            document.getElementById('action-tray').style.display = 'none';
             socket.emit('mafia_cast_vote', target);
         }
 
         socket.on('mafia_executed', ({ username, role }) => {
-            if (username) {
-                addBoardMsg(`⚖️ 투표 결과, @${username} (${role}) 님이 처형되었습니다.`, 'system');
-            } else {
-                addBoardMsg(`⚖️ 투표가 무효 처리되거나 스킵되어 처형자가 없습니다.`, 'system');
-            }
+            if (currentGame !== 'mafia') return;
+            if (username) appendSystemMessage(`⚖️ 투표 결과, @${username} (${role}) 님이 처형되었습니다.`);
+            else appendSystemMessage(`⚖️ 스킵되었거나 동점으로 처형자가 없습니다.`);
         });
 
         socket.on('mafia_night_start', ({ candidates }) => {
+            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = '밤 페이즈 (스킬 사용)';
-            addBoardMsg(`🌙 밤이 되었습니다. 마피아, 의사, 경찰은 대상에게 스킬을 사용하세요.`, 'system');
+            appendSystemMessage('🌙 밤이 되었습니다.');
 
-            const tray = document.getElementById('vote-action-buttons');
+            const tray = document.getElementById('action-tray');
             tray.innerHTML = '';
 
+            // 직업을 가진 사람에게만 스킬 버튼 노출
             if (myRole === '마피아') {
+                tray.style.display = 'flex';
                 candidates.forEach(u => {
-                    tray.innerHTML += `<button class="game-btn skill" onclick="useNightSkill('kill', '${u}')">처형: ${u}</button>`;
+                    tray.innerHTML += `<button class="game-btn skill" onclick="useSkill('kill', '${u}')">처형: ${u}</button>`;
                 });
             } else if (myRole === '의사') {
+                tray.style.display = 'flex';
                 candidates.forEach(u => {
-                    tray.innerHTML += `<button class="game-btn skill" onclick="useNightSkill('heal', '${u}')">치료: ${u}</button>`;
+                    tray.innerHTML += `<button class="game-btn skill" onclick="useSkill('heal', '${u}')">치료: ${u}</button>`;
                 });
             } else if (myRole === '경찰') {
+                tray.style.display = 'flex';
                 candidates.forEach(u => {
-                    tray.innerHTML += `<button class="game-btn skill" onclick="useNightSkill('investigate', '${u}')">조사: ${u}</button>`;
+                    tray.innerHTML += `<button class="game-btn skill" onclick="useSkill('investigate', '${u}')">조사: ${u}</button>`;
                 });
             } else {
-                tray.innerHTML = `<span style="color:#888;font-size:12px;">시민은 조용히 밤을 기다립니다...</span>`;
+                tray.style.display = 'none';
+                appendSystemMessage('시민은 조용히 아침을 기다립니다...');
             }
         });
 
-        function useNightSkill(action, target) {
-            document.getElementById('vote-action-buttons').innerHTML = `<span style="color:#e056fd;font-size:12px;">스킬 대상 선택 완료: ${target}</span>`;
+        function useSkill(action, target) {
+            document.getElementById('action-tray').style.display = 'none';
             socket.emit('mafia_night_action', { action, target });
         }
 
-        socket.on('mafia_investigate_result', ({ target, isMafia }) => {
-            addBoardMsg(`🔍 [경찰 조사] @${target} 님은 ${isMafia ? '마피아가 맞습니다! 🚨' : '선량한 시민입니다. ✅'}`, 'highlight');
+        // 경찰 본인 소켓만 수신하는 비밀 조사 결과
+        socket.on('mafia_investigate_private_result', ({ target, isMafia }) => {
+            if (currentGame !== 'mafia') return;
+            appendSystemMessage(`🔍 [나에게만 보이는 조사 결과] @${target} 님은 ${isMafia ? '마피아가 맞습니다! 🚨' : '선량한 시민입니다. ✅'}`, true);
         });
 
         socket.on('mafia_night_result', ({ killed }) => {
-            if (killed) {
-                addBoardMsg(`⚰️ 지난 밤, @${killed} 님이 마피아의 공격으로 사망하였습니다.`, 'system');
-            } else {
-                addBoardMsg(`🛡️ 의사의 치료 또는 공격 불발로 사망자가 발생하지 않았습니다!`, 'highlight');
-            }
+            if (currentGame !== 'mafia') return;
+            if (killed) appendSystemMessage(`⚰️ 지난 밤, @${killed} 님이 사망하였습니다.`);
+            else appendSystemMessage(`🛡️ 지난 밤에는 아무도 사망하지 않았습니다!`);
         });
 
-        socket.on('mafia_timer_update', ({ timer, phase }) => {
+        socket.on('mafia_timer_update', ({ timer }) => {
+            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-timer').innerText = `${timer}초`;
         });
 
-        // ================= 헤즈업 게임 플로우 =================
+        // ================= 헤즈업 게임 로직 =================
         socket.on('headsup_suggest_phase', ({ targetUser, timer }) => {
-            document.getElementById('game-phase-name').innerText = '헤즈업 제시어 상의';
+            if (currentGame !== 'headsUp') return;
+            document.getElementById('game-phase-name').innerText = '제시어 상의 (10초)';
             if (targetUser === myUsername) {
-                addBoardMsg(`🃏 당신이 이번 턴의 술래입니다! 다른 유저들이 제시어를 정하고 있습니다.`, 'system');
+                appendSystemMessage(`🃏 당신이 이번 턴의 술래입니다! 다른 유저들이 제시어를 정하고 있습니다.`);
             } else {
-                addBoardMsg(`💡 이번 턴의 술래는 @${targetUser} 님입니다. 10초 동안 채팅으로 제시어를 추천하세요!`, 'highlight');
+                appendSystemMessage(`💡 술래는 @${targetUser} 님입니다. 채팅으로 제시어를 추천하세요!`);
             }
         });
 
         socket.on('headsup_explain_start', ({ targetUser, word }) => {
-            document.getElementById('game-phase-name').innerText = '헤즈업 설명 턴';
+            if (currentGame !== 'headsUp') return;
+            document.getElementById('game-phase-name').innerText = '설명 턴';
             if (targetUser === myUsername) {
-                addBoardMsg(`🙈 술래는 제시어를 볼 수 없습니다! 다른 사람들의 설명을 듣고 맞혀보세요.`, 'system');
+                appendSystemMessage(`🙈 당신은 술래입니다! 다른 사람들의 설명을 듣고 정답을 맞혀보세요.`);
             } else {
-                addBoardMsg(`🎯 확정 제시어: [ ${word} ] ! 술래(@${targetUser})에게 정답을 말하지 말고 설명해주세요!`, 'highlight');
+                appendSystemMessage(`🎯 확정 제시어: [ ${word} ] ! 술래에게 들키지 않게 설명하세요!`);
             }
         });
 
         socket.on('headsup_timer_update', ({ timer }) => {
+            if (currentGame !== 'headsUp') return;
             document.getElementById('game-phase-timer').innerText = `${timer}초`;
         });
 
-        // 공통 게임 채팅
+        // ================= 채팅 메시지 렌더링 =================
         function sendGameChat() {
-            const inp = document.getElementById('game-chat-input');
-            const val = inp.value.trim();
+            const input = document.getElementById('game-chat-input');
+            const val = input.value.trim();
             if (!val) return;
             socket.emit('game_chat_message', val);
-            socket.emit('headsup_suggest_word', val);
-            inp.value = '';
+            if (currentGame === 'headsUp') socket.emit('headsup_suggest_word', val);
+            input.value = '';
         }
 
-        socket.on('game_chat_broadcast', ({ username, msg }) => {
-            addBoardMsg(`@${username}: ${msg}`);
+        socket.on('game_chat_broadcast', (data) => {
+            appendUserMessage(data);
         });
 
-        function addBoardMsg(text, type = '') {
-            const board = document.getElementById('game-board');
-            const div = document.createElement('div');
-            div.className = `board-msg ${type}`;
-            div.innerText = text;
-            board.appendChild(div);
-            board.scrollTop = board.scrollHeight;
+        function appendUserMessage(data) {
+            const chatMessages = document.getElementById('game-messages');
+            const isMine = data.username === myUsername;
+
+            const box = document.createElement('div');
+            box.className = `message-box ${isMine ? 'mine' : 'other'}`;
+
+            if (!isMine) {
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'sender-name';
+                nameDiv.innerText = data.username;
+                box.appendChild(nameDiv);
+            }
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerText = data.message;
+            box.appendChild(bubble);
+
+            const time = document.createElement('span');
+            time.className = 'time';
+            time.innerText = data.time;
+            box.appendChild(time);
+
+            chatMessages.appendChild(box);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function appendSystemMessage(text, isSecret = false) {
+            const chatMessages = document.getElementById('game-messages');
+            const box = document.createElement('div');
+            box.className = `message-box system ${isSecret ? 'secret' : ''}`;
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerText = text;
+            box.appendChild(bubble);
+            chatMessages.appendChild(box);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     </script>
 </body>
