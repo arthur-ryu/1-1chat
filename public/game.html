@@ -116,7 +116,7 @@
             <div class="action-tray" id="action-tray"></div>
 
             <div class="chat-input-area">
-                <input type="text" id="game-chat-input" placeholder="대화를 입력하세요..." onkeydown="if(event.key==='Enter') sendGameChat()">
+                <input type="text" id="game-chat-input" placeholder="대화를 입력하세요..." onkeydown="handleGameKeyDown(event)">
                 <button id="game-chat-send-btn" onclick="sendGameChat()">전송</button>
             </div>
         </div>
@@ -177,7 +177,7 @@
             document.getElementById('lobby-view').style.display = 'none';
             document.getElementById('busy-view').style.display = 'none';
             document.getElementById('ingame-view').style.display = 'flex';
-            document.getElementById('game-messages').innerHTML = ''; // 이전 게임 메시지 완전 삭제
+            document.getElementById('game-messages').innerHTML = '';
         });
 
         // 4명 미만으로 게임 중단 시 리셋
@@ -192,7 +192,7 @@
             isSpectating = false;
         });
 
-        // 직업 배정 (상단 타이틀 옆에 내 직업 상시 표시)
+        // 직업 배정
         socket.on('mafia_assigned_role', ({ role }) => {
             if (isSpectating) return;
             myRole = role;
@@ -218,7 +218,7 @@
             }, 100);
         });
 
-        // 자기소개 페이즈: 차례인 사람만 채팅 가능
+        // 자기소개 페이즈
         socket.on('mafia_turn_intro', ({ currentSpeaker, index, total }) => {
             document.getElementById('game-phase-name').innerText = `자기소개 페이즈 (${index + 1}/${total})`;
             appendSystemMessage(`📢 [자기소개] @${currentSpeaker} 님의 발언 턴입니다.`);
@@ -242,18 +242,18 @@
             socket.emit('mafia_intro_finish');
         }
 
-        // 자유 토론: 모두 채팅 가능
+        // 자유 토론 페이즈
         socket.on('mafia_day_talk_start', () => {
             document.getElementById('game-phase-name').innerText = '자유 토론';
             document.getElementById('action-tray').style.display = 'none';
             setChatLock(false, '자유롭게 대화하세요...');
-            appendSystemMessage('☀️ 아침이 밝았습니다! 20초간 토론하세요.');
+            appendSystemMessage('☀️ 아침이 밝았습니다! 20초간 의심되는 대상을 토론하세요.');
         });
 
         // 처형 투표 페이즈
         socket.on('mafia_vote_phase_start', ({ candidates }) => {
             document.getElementById('game-phase-name').innerText = '처형 투표';
-            appendSystemMessage('🗳️ 의심되는 사람에게 투표하세요. (skip 가능)');
+            appendSystemMessage('🗳️ 투표가 시작되었습니다! 의심되는 사람 또는 skip을 선택하세요.');
 
             if (isSpectating) return;
 
@@ -276,12 +276,11 @@
             else appendSystemMessage(`⚖️ 동점 또는 스킵으로 인해 아무도 처형되지 않았습니다.`);
         });
 
-        // 밤 페이즈: 모든 참가자 채팅 완전 차단
+        // 밤 페이즈
         socket.on('mafia_night_start', ({ candidates }) => {
-            document.getElementById('game-phase-name').innerText = '밤 (스킬 사용)';
-            appendSystemMessage('🌙 밤이 되었습니다.');
+            document.getElementById('game-phase-name').innerText = '밤 페이즈 (스킬 사용)';
+            appendSystemMessage('🌙 밤이 되었습니다. 조용히 눈을 감아주세요.');
 
-            // 밤에는 채팅 입력 비활성화
             setChatLock(true, '밤에는 채팅을 칠 수 없습니다...');
 
             if (isSpectating) return;
@@ -306,7 +305,7 @@
                 });
             } else {
                 tray.style.display = 'none';
-                appendSystemMessage('시민은 아침을 기다립니다...');
+                appendSystemMessage('시민은 조용히 아침을 기다립니다...');
             }
         });
 
@@ -316,7 +315,7 @@
         }
 
         socket.on('mafia_investigate_private_result', ({ target, isMafia }) => {
-            appendSystemMessage(`🔍 [경찰 조사 결과] @${target} 님은 ${isMafia ? '마피아가 맞습니다! 🚨' : '선량한 시민입니다. ✅'}`, true);
+            appendSystemMessage(`🔍 [비밀 조사 결과] @${target} 님은 ${isMafia ? '마피아가 맞습니다! 🚨' : '선량한 시민입니다. ✅'}`, true);
         });
 
         socket.on('mafia_night_result', ({ killed }) => {
@@ -334,11 +333,20 @@
             document.getElementById('action-tray').style.display = 'none';
             setChatLock(true, '게임이 종료되었습니다.');
             setTimeout(() => {
-                location.reload(); // 5초 후 대기실 새로고침
+                location.reload();
             }, 5000);
         });
 
-        // 인게임 대화 전송
+        // 한글 입력 중복(2번 전송) 방지 키다운 핸들러
+        function handleGameKeyDown(event) {
+            if (event.isComposing || event.keyCode === 229) return;
+
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendGameChat();
+            }
+        }
+
         function sendGameChat() {
             if (!isChatAllowed) return;
             const input = document.getElementById('game-chat-input');
