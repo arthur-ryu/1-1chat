@@ -27,34 +27,251 @@ const userIpMap = new Map();
 
 let currentScreenSharer = null;
 
-// 게임 허브 상태 관리
-let gameLobby = {
-    votes: { mafia: new Set(), headsUp: new Set() },
-    countdown: null,
-    timer: 10,
-    activeGame: null // 'mafia' | 'headsUp' | null
-};
-
-let mafiaState = {
-    phase: 'idle',
-    players: [], // [{ socketId, username, role, isAlive }]
+// ================= 마피아 전용 게임 상태 관리 =================
+let gameSockets = new Map(); // socketId -> username
+let mafiaGame = {
+    isRunning: false,
+    phase: 'idle', // 'idle' | 'roleReveal' | 'intro' | 'dayTalk' | 'dayVote' | 'night' | 'ended'
+    players: [],   // [{ socketId, username, role, isAlive, isSpectator }]
     introIndex: 0,
     timer: 0,
     interval: null,
-    votes: {},
+    votes: {},     // voter -> target
     nightActions: { killTarget: null, healTarget: null }
 };
 
-let headsUpState = {
-    phase: 'idle',
-    players: [],
-    targetUser: null,
-    currentWord: '',
-    suggestions: {},
-    timer: 0,
-    interval: null
-};
+let lobbyCountdown = null;
+let lobbyTimer = 5;
 
+function clearMafiaTimers() {
+    if (mafiaGame.interval) {
+        clearInterval(mafiaGame.interval);
+        mafiaGame.interval = null;
+    }
+    if (lobbyCountdown) {
+        clearInterval(lobbyCountdown);
+        lobbyCountdown = null;
+    }
+}
+
+function checkLobbyStart() {
+    if (mafiaGame.isRunning) return;
+
+    const currentCount = gameSockets.size;
+    io.emit('mafia_lobby_status', {
+        currentCount,
+        requiredCount: 4,
+        canStart: currentCount >= 4
+    });
+
+    if (currentCount >= 4) {
+        if (!lobbyCountdown) {
+            lobbyTimer = 5;
+            io.emit('mafia_lobby_timer', lobbyTimer);
+            lobbyCountdown = setInterval(() => {
+                lobbyTimer--;
+                io.emit('mafia_lobby_timer', lobbyTimer);
+                if (lobbyTimer <= 0) {
+                    clearInterval(lobbyCountdown);
+                    lobbyCountdown = null;
+                    startMafiaGame();
+                }
+            }, 1000);
+        }
+    } else {
+        if (lobbyCountdown) {
+            clearInterval(lobbyCountdown);
+            lobbyCountdown = null;
+            io.emit('mafia_lobby_timer', null);
+        }
+    }
+}
+
+function startMafiaGame() {
+    clearMafiaTimers();
+    mafiaGame.isRunning = true;
+    mafiaGame.phase = 'roleReveal';
+    mafiaGame.introIndex = 0;
+    mafiaGame.votes = {};
+    mafiaGame.nightActions = { killTarget: null, healTarget: null };
+
+    // 접속한 소켓들로 플레이어 구성
+    const entries = Array.from(gameSockets.entries());
+    const players = entries.map(([sId, uName]) => ({
+        socketId: sId,
+        username: uName,
+        role: '시민',
+        isAlive: true,
+        isSpectator: false
+    }));
+
+    // 역할 배정 (마피아 1, 경찰 1, 의사 1, 나머지 시민)
+    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    const assignedRoles = ['마피아', '경찰', '의사'];
+    assignedRoles.forEach((role, idx) => {
+        if (shuffled[idx]) shuffled[idx].role = role;
+    });
+
+    mafiaGame.players = shuffled;
+
+    io.emit('mafia_game_started');
+
+    // 본인 역할 개별 전송
+    mafiaGame.players.forEach(p => {
+        io.to(p.socketId).emit('mafia_assigned_role', { role: p.role });
+    });
+
+    setTimeout(() => {
+        if (mafiaGame.isRunning) startIntroPhase();
+    }, 6500);
+}
+
+function startIntroPhase() {
+    if (!mafiaGame.isRunning) return;
+    mafiaGame.phase = 'intro';
+    const current = mafiaGame.players[mafiaGame.introIndex];
+
+    if (!current || mafiaGame.introIndex >= mafiaGame.players.length) {
+        startDayTalkPhase();
+        return;
+    }
+
+    io.emit('mafia_turn_intro', {
+        currentSpeaker: current.username,
+        index: mafiaGame.introIndex,
+        total: mafiaGame.players.length
+    });
+}
+
+function startDayTalkPhase() {
+    if (!mafiaGame.isRunning) return;
+    clearMafiaTimers();
+    mafiaGame.phase = 'dayTalk';
+    mafiaGame.timer = 20;
+
+    io.emit('mafia_day_talk_start', { timer: mafiaGame.timer });
+
+    mafiaGame.interval = setInterval(() => {
+        if (!mafiaGame.isRunning) return clearMafiaTimers();
+        mafiaGame.timer--;
+        io.emit('mafia_timer_update', { timer: mafiaGame.timer, phase: '자유 토론' });
+        if (mafiaGame.timer <= 0) {
+            clearMafiaTimers();
+            startDayVotePhase();
+        }
+    }, 1000);
+}
+
+function startDayVotePhase() {
+    if (!mafiaGame.isRunning) return;
+    clearMafiaTimers();
+    mafiaGame.phase = 'dayVote';
+    mafiaGame.votes = {};
+    mafiaGame.timer = 15;
+
+    const candidates = mafiaGame.players.filter(p => p.isAlive).map(p => p.username);
+    io.emit('mafia_vote_phase_start', { candidates, timer: mafiaGame.timer });
+
+    mafiaGame.interval = setInterval(() => {
+        if (!mafiaGame.isRunning) return clearMafiaTimers();
+        mafiaGame.timer--;
+        io.emit('mafia_timer_update', { timer: mafiaGame.timer, phase: '처형 투표' });
+        if (mafiaGame.timer <= 0) {
+            clearMafiaTimers();
+            finishDayVote();
+        }
+    }, 1000);
+}
+
+function finishDayVote() {
+    if (!mafiaGame.isRunning) return;
+    const tally = {};
+    Object.values(mafiaGame.votes).forEach(t => {
+        if (t !== 'skip') tally[t] = (tally[t] || 0) + 1;
+    });
+
+    let max = 0, executed = null;
+    for (let u in tally) {
+        if (tally[u] > max) { max = tally[u]; executed = u; }
+    }
+
+    if (executed && max > 1) {
+        const victim = mafiaGame.players.find(p => p.username === executed);
+        if (victim) victim.isAlive = false;
+        io.emit('mafia_executed', { username: executed, role: victim ? victim.role : '' });
+    } else {
+        io.emit('mafia_executed', { username: null });
+    }
+
+    if (checkGameEnd()) return;
+
+    setTimeout(() => {
+        if (mafiaGame.isRunning) startNightPhase();
+    }, 4000);
+}
+
+function startNightPhase() {
+    if (!mafiaGame.isRunning) return;
+    clearMafiaTimers();
+    mafiaGame.phase = 'night';
+    mafiaGame.nightActions = { killTarget: null, healTarget: null };
+    mafiaGame.timer = 15;
+
+    const aliveUsers = mafiaGame.players.filter(p => p.isAlive).map(p => p.username);
+    io.emit('mafia_night_start', { candidates: aliveUsers, timer: mafiaGame.timer });
+
+    mafiaGame.interval = setInterval(() => {
+        if (!mafiaGame.isRunning) return clearMafiaTimers();
+        mafiaGame.timer--;
+        io.emit('mafia_timer_update', { timer: mafiaGame.timer, phase: '밤 스킬 사용' });
+        if (mafiaGame.timer <= 0) {
+            clearMafiaTimers();
+            resolveNightPhase();
+        }
+    }, 1000);
+}
+
+function resolveNightPhase() {
+    if (!mafiaGame.isRunning) return;
+    let killed = null;
+    const { killTarget, healTarget } = mafiaGame.nightActions;
+    if (killTarget && killTarget !== healTarget) {
+        killed = killTarget;
+        const victim = mafiaGame.players.find(p => p.username === killed);
+        if (victim) victim.isAlive = false;
+    }
+
+    io.emit('mafia_night_result', { killed });
+
+    if (checkGameEnd()) return;
+
+    setTimeout(() => {
+        if (mafiaGame.isRunning) startDayTalkPhase();
+    }, 4000);
+}
+
+function checkGameEnd() {
+    const aliveMafia = mafiaGame.players.filter(p => p.isAlive && p.role === '마피아').length;
+    const aliveCitizens = mafiaGame.players.filter(p => p.isAlive && p.role !== '마피아').length;
+
+    if (aliveMafia === 0) {
+        endMafiaGame('시민 팀 승리! 모든 마피아가 소탕되었습니다. 🎉');
+        return true;
+    } else if (aliveMafia >= aliveCitizens) {
+        endMafiaGame('마피아 팀 승리! 마피아가 도시를 장악했습니다. 😈');
+        return true;
+    }
+    return false;
+}
+
+function endMafiaGame(resultText) {
+    clearMafiaTimers();
+    mafiaGame.isRunning = false;
+    mafiaGame.phase = 'ended';
+    io.emit('mafia_game_ended', { resultText });
+}
+
+// ================= Express 및 기본 소켓 =================
 async function startServer() {
     try {
         const client = new MongoClient(mongoURI);
@@ -163,14 +380,14 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
     const cmd = commandText.trim();
 
     if (cmd === '/game') {
-        await sendBotMessage(`🎮 게임 대기실이 열렸습니다! 아래 버튼을 눌러 이동하세요.`, { isGameLink: true });
+        await sendBotMessage(`🎮 마피아 게임 대기실이 열렸습니다! 아래 버튼을 눌러 이동하세요.`, { isGameLink: true });
         return true;
     }
 
     if (cmd === '/help') {
         const helpLines = [
             '🤖 [봇 명령어 안내]',
-            '• /game : 미니게임(마피아 / 헤즈업) 방으로 이동합니다.',
+            '• /game : 마피아 게임 방으로 이동합니다.',
             '• /가위바위보 : 5초 카운트다운 후 봇과 가위바위보 진행',
             '• /출석체크 : 출석체크 및 연속 출석일수 확인',
             '• /출석랭킹 : 멤버 출석 랭킹 확인',
@@ -278,7 +495,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
                 }
             }
         } catch (err) {
-            console.error('alldel 처리 에러:', err);
+            console.error('alldel 에러:', err);
         }
         return true;
     }
@@ -398,216 +615,6 @@ async function broadcastUserList() {
     emitToActiveUsers('update_user_list', { onlineList, allMembers });
 }
 
-// ================= 게임 로비 & 격리 진행 =================
-function startLobbyCountdown() {
-    if (gameLobby.countdown) return;
-    gameLobby.timer = 10;
-    io.emit('game_lobby_timer', gameLobby.timer);
-
-    gameLobby.countdown = setInterval(() => {
-        gameLobby.timer--;
-        io.emit('game_lobby_timer', gameLobby.timer);
-        if (gameLobby.timer <= 0) {
-            clearInterval(gameLobby.countdown);
-            gameLobby.countdown = null;
-
-            const mafiaCount = gameLobby.votes.mafia.size;
-            const headsUpCount = gameLobby.votes.headsUp.size;
-            const chosen = mafiaCount >= headsUpCount ? 'mafia' : 'headsUp';
-            gameLobby.activeGame = chosen;
-
-            io.emit('game_started', { game: chosen, title: chosen === 'mafia' ? '마피아 게임' : '헤즈업 게임' });
-            if (chosen === 'mafia') initMafiaGame();
-            else initHeadsUpGame();
-        }
-    }, 1000);
-}
-
-function initMafiaGame() {
-    const sockets = Array.from(io.sockets.sockets.values());
-    const players = sockets.map(s => ({
-        socketId: s.id,
-        username: s.handshake.query.username || '익명',
-        role: '시민',
-        isAlive: true
-    }));
-
-    if (players.length === 0) return;
-
-    const roles = ['마피아', '경찰', '의사'];
-    const shuffled = [...players].sort(() => Math.random() - 0.5);
-    roles.forEach((r, idx) => {
-        if (shuffled[idx]) shuffled[idx].role = r;
-    });
-
-    mafiaState.players = shuffled;
-    mafiaState.phase = 'roleReveal';
-    mafiaState.introIndex = 0;
-
-    mafiaState.players.forEach(p => {
-        io.to(p.socketId).emit('mafia_assigned_role', { role: p.role });
-    });
-
-    setTimeout(() => {
-        if (gameLobby.activeGame === 'mafia') startMafiaIntroPhase();
-    }, 6500);
-}
-
-function startMafiaIntroPhase() {
-    if (gameLobby.activeGame !== 'mafia') return;
-    mafiaState.phase = 'intro';
-    const current = mafiaState.players[mafiaState.introIndex];
-    if (!current) {
-        startMafiaDayTalkPhase();
-        return;
-    }
-    io.emit('mafia_turn_intro', {
-        currentSpeaker: current.username,
-        index: mafiaState.introIndex,
-        total: mafiaState.players.length
-    });
-}
-
-function startMafiaDayTalkPhase() {
-    if (gameLobby.activeGame !== 'mafia') return;
-    mafiaState.phase = 'dayTalk';
-    mafiaState.timer = 20;
-    io.emit('mafia_day_talk_start', { timer: mafiaState.timer });
-
-    if (mafiaState.interval) clearInterval(mafiaState.interval);
-    mafiaState.interval = setInterval(() => {
-        if (gameLobby.activeGame !== 'mafia') return clearInterval(mafiaState.interval);
-        mafiaState.timer--;
-        io.emit('mafia_timer_update', { timer: mafiaState.timer, phase: '자유 토론' });
-        if (mafiaState.timer <= 0) {
-            clearInterval(mafiaState.interval);
-            startMafiaDayVotePhase();
-        }
-    }, 1000);
-}
-
-function startMafiaDayVotePhase() {
-    if (gameLobby.activeGame !== 'mafia') return;
-    mafiaState.phase = 'dayVote';
-    mafiaState.votes = {};
-    mafiaState.timer = 15;
-    const candidates = mafiaState.players.filter(p => p.isAlive).map(p => p.username);
-    io.emit('mafia_vote_phase_start', { candidates, timer: mafiaState.timer });
-
-    if (mafiaState.interval) clearInterval(mafiaState.interval);
-    mafiaState.interval = setInterval(() => {
-        if (gameLobby.activeGame !== 'mafia') return clearInterval(mafiaState.interval);
-        mafiaState.timer--;
-        io.emit('mafia_timer_update', { timer: mafiaState.timer, phase: '투표' });
-        if (mafiaState.timer <= 0) {
-            clearInterval(mafiaState.interval);
-            finishMafiaDayVote();
-        }
-    }, 1000);
-}
-
-function finishMafiaDayVote() {
-    if (gameLobby.activeGame !== 'mafia') return;
-    const tally = {};
-    Object.values(mafiaState.votes).forEach(t => {
-        if (t !== 'skip') tally[t] = (tally[t] || 0) + 1;
-    });
-    let max = 0, executed = null;
-    for (let u in tally) {
-        if (tally[u] > max) { max = tally[u]; executed = u; }
-    }
-
-    if (executed && max > 1) {
-        const victim = mafiaState.players.find(p => p.username === executed);
-        if (victim) victim.isAlive = false;
-        io.emit('mafia_executed', { username: executed, role: victim ? victim.role : '' });
-    } else {
-        io.emit('mafia_executed', { username: null });
-    }
-
-    setTimeout(() => {
-        if (gameLobby.activeGame === 'mafia') startMafiaNightPhase();
-    }, 4000);
-}
-
-function startMafiaNightPhase() {
-    if (gameLobby.activeGame !== 'mafia') return;
-    mafiaState.phase = 'night';
-    mafiaState.nightActions = { killTarget: null, healTarget: null };
-    mafiaState.timer = 15;
-
-    const aliveUsers = mafiaState.players.filter(p => p.isAlive).map(p => p.username);
-    io.emit('mafia_night_start', { candidates: aliveUsers, timer: mafiaState.timer });
-
-    if (mafiaState.interval) clearInterval(mafiaState.interval);
-    mafiaState.interval = setInterval(() => {
-        if (gameLobby.activeGame !== 'mafia') return clearInterval(mafiaState.interval);
-        mafiaState.timer--;
-        io.emit('mafia_timer_update', { timer: mafiaState.timer, phase: '밤 스킬 사용' });
-        if (mafiaState.timer <= 0) {
-            clearInterval(mafiaState.interval);
-            resolveMafiaNight();
-        }
-    }, 1000);
-}
-
-function resolveMafiaNight() {
-    if (gameLobby.activeGame !== 'mafia') return;
-    let killed = null;
-    const { killTarget, healTarget } = mafiaState.nightActions;
-    if (killTarget && killTarget !== healTarget) {
-        killed = killTarget;
-        const victim = mafiaState.players.find(p => p.username === killed);
-        if (victim) victim.isAlive = false;
-    }
-    io.emit('mafia_night_result', { killed });
-    setTimeout(() => {
-        if (gameLobby.activeGame === 'mafia') startMafiaDayTalkPhase();
-    }, 4000);
-}
-
-function initHeadsUpGame() {
-    const sockets = Array.from(io.sockets.sockets.values());
-    headsUpState.players = sockets.map(s => ({
-        socketId: s.id,
-        username: s.handshake.query.username || '익명'
-    }));
-
-    if (headsUpState.players.length === 0) return;
-    headsUpState.targetUser = headsUpState.players[0].username;
-    headsUpState.phase = 'suggestWord';
-    headsUpState.suggestions = {};
-    headsUpState.timer = 10;
-
-    io.emit('headsup_suggest_phase', {
-        targetUser: headsUpState.targetUser,
-        timer: headsUpState.timer
-    });
-
-    if (headsUpState.interval) clearInterval(headsUpState.interval);
-    headsUpState.interval = setInterval(() => {
-        if (gameLobby.activeGame !== 'headsUp') return clearInterval(headsUpState.interval);
-        headsUpState.timer--;
-        io.emit('headsup_timer_update', { timer: headsUpState.timer });
-        if (headsUpState.timer <= 0) {
-            clearInterval(headsUpState.interval);
-            const words = Object.values(headsUpState.suggestions);
-            headsUpState.currentWord = words[Math.floor(Math.random() * words.length)] || '피카츄';
-            startHeadsUpExplaining();
-        }
-    }, 1000);
-}
-
-function startHeadsUpExplaining() {
-    if (gameLobby.activeGame !== 'headsUp') return;
-    headsUpState.phase = 'explaining';
-    io.emit('headsup_explain_start', {
-        targetUser: headsUpState.targetUser,
-        word: headsUpState.currentWord
-    });
-}
-
-// ================= 소켓 연결 =================
 io.on('connection', async (socket) => {
     const username = socket.handshake.query.username;
 
@@ -629,6 +636,7 @@ io.on('connection', async (socket) => {
         db.collection('messages').find().toArray().then(history => socket.emit('load_history', history)).catch(err => console.error(err));
     }
 
+    // 메인 채팅
     socket.on('send_message', async (data) => {
         if (kickedUsers.has(username)) return;
 
@@ -660,6 +668,7 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // 화면 공유
     socket.on('start_screen_share', async () => {
         if (kickedUsers.has(username)) return;
         currentScreenSharer = { username, socketId: socket.id };
@@ -694,43 +703,41 @@ io.on('connection', async (socket) => {
         io.to(targetSocketId).emit('screen_ice_candidate_received', { senderSocketId: socket.id, candidate });
     });
 
-    // 게임 투표 및 통신
-    socket.on('game_vote', (type) => {
-        if (type === 'mafia') {
-            gameLobby.votes.headsUp.delete(username);
-            gameLobby.votes.mafia.add(username);
-        } else if (type === 'headsUp') {
-            gameLobby.votes.mafia.delete(username);
-            gameLobby.votes.headsUp.add(username);
+    // ================= 게임 소켓 이벤트 =================
+    socket.on('join_game_lobby', () => {
+        if (mafiaGame.isRunning) {
+            socket.emit('game_already_running');
+            return;
         }
+        gameSockets.set(socket.id, username);
+        checkLobbyStart();
+    });
 
-        io.emit('game_votes_updated', {
-            mafia: gameLobby.votes.mafia.size,
-            headsUp: gameLobby.votes.headsUp.size
+    socket.on('join_as_spectator', () => {
+        socket.emit('spectator_joined', {
+            phase: mafiaGame.phase,
+            timer: mafiaGame.timer
         });
-
-        startLobbyCountdown();
     });
 
     socket.on('mafia_intro_finish', () => {
-        if (gameLobby.activeGame !== 'mafia') return;
-        mafiaState.introIndex++;
-        startMafiaIntroPhase();
+        if (!mafiaGame.isRunning) return;
+        mafiaGame.introIndex++;
+        startIntroPhase();
     });
 
     socket.on('mafia_cast_vote', (target) => {
-        if (gameLobby.activeGame !== 'mafia') return;
-        mafiaState.votes[username] = target;
+        if (!mafiaGame.isRunning) return;
+        mafiaGame.votes[username] = target;
         io.emit('mafia_vote_received', { voter: username });
     });
 
-    // 직업 스킬 처리 (경찰 조사는 해당 경찰에게만 비공개 전송)
     socket.on('mafia_night_action', ({ action, target }) => {
-        if (gameLobby.activeGame !== 'mafia') return;
-        if (action === 'kill') mafiaState.nightActions.killTarget = target;
-        if (action === 'heal') mafiaState.nightActions.healTarget = target;
+        if (!mafiaGame.isRunning) return;
+        if (action === 'kill') mafiaGame.nightActions.killTarget = target;
+        if (action === 'heal') mafiaGame.nightActions.healTarget = target;
         if (action === 'investigate') {
-            const tUser = mafiaState.players.find(p => p.username === target);
+            const tUser = mafiaGame.players.find(p => p.username === target);
             socket.emit('mafia_investigate_private_result', {
                 target,
                 isMafia: tUser ? (tUser.role === '마피아') : false
@@ -738,26 +745,26 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('headsup_suggest_word', (word) => {
-        if (gameLobby.activeGame !== 'headsUp') return;
-        headsUpState.suggestions[username] = word;
-    });
-
-    // 인게임 채팅 메시지 (메인 채팅과 동일한 포맷 브로드캐스트)
     socket.on('game_chat_message', (msgText) => {
         if (kickedUsers.has(username)) return;
+
+        // 관전자는 사망자나 미참가자처럼 구경만 가능 (채팅 입력 제한 가능하나 원활한 참여를 위해 말머리 부착)
+        const player = mafiaGame.players.find(p => p.username === username);
+        const isDead = player && !player.isAlive;
+
         const now = new Date();
         const timeString = now.toLocaleTimeString('ko-KR', {
             timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: true
         });
 
         io.emit('game_chat_broadcast', {
-            username: username,
+            username: isDead ? `[사망자] ${username}` : username,
             message: msgText,
             time: timeString
         });
     });
 
+    // 기타 채팅 기능
     socket.on('mark_read', async (messageId) => {
         if (!username || kickedUsers.has(username)) return;
         try {
@@ -827,6 +834,11 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('disconnect', async () => {
+        if (gameSockets.has(socket.id)) {
+            gameSockets.delete(socket.id);
+            checkLobbyStart();
+        }
+
         if (currentScreenSharer && currentScreenSharer.socketId === socket.id) {
             const sName = currentScreenSharer.username;
             currentScreenSharer = null;
