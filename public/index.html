@@ -54,7 +54,6 @@
         .reply-quote:hover { background: rgba(0,0,0,0.12); }
         .chat-image { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 4px; display: block; }
 
-        /* 답장 클릭 하이라이트 애니메이션 */
         @keyframes highlightFlash {
             0% { transform: scale(1); filter: brightness(1); }
             50% { transform: scale(1.03); filter: brightness(1.2); }
@@ -62,7 +61,6 @@
         }
         .highlight-target { animation: highlightFlash 0.7s ease-in-out; }
 
-        /* 화면 공유 버튼 뱃지 */
         .screen-share-btn {
             display: inline-block;
             margin-top: 6px;
@@ -74,11 +72,12 @@
             font-size: 12px;
             font-weight: bold;
             cursor: pointer;
+            text-decoration: none;
         }
         .screen-share-btn.stop { background: #d9534f; }
+        .screen-share-btn.game-btn { background: #28a745; }
         .screen-share-btn:hover { opacity: 0.9; }
 
-        /* + 첨부 메뉴 팝업 */
         #attach-menu-dropdown {
             display: none;
             position: absolute;
@@ -109,7 +108,6 @@
         .attach-menu-item:last-child { border-bottom: none; }
         .attach-menu-item:hover { background: #f5f5f5; }
 
-        /* Reactions under message */
         .reaction-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .mine .reaction-container { justify-content: flex-end; }
         .other .reaction-container { justify-content: flex-start; }
@@ -131,7 +129,6 @@
         #scroll-bottom-btn { display: none; position: absolute; bottom: 15px; right: 15px; background: #ffffff; color: #333; border: 1px solid #ccc; width: 36px; height: 36px; border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; justify-content: center; align-items: center; }
         #scroll-bottom-btn:hover { background: #f0f0f0; }
 
-        /* 화면 공유 전체화면 뷰어 모달 */
         #screen-viewer-modal {
             display: none;
             position: fixed;
@@ -203,7 +200,6 @@
         .mention-item:hover { background: #f0f0f0; }
         .mention-highlight { color: #0066ff; font-weight: bold; }
 
-        /* Dark Mode Overrides */
         .container.dark-mode { background-color: #18191a !important; color: #e4e6eb !important; }
         .container.dark-mode .chat-header { background-color: #242526 !important; color: #e4e6eb !important; }
         .container.dark-mode #user-list-btn, .container.dark-mode #noti-toggle-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
@@ -278,7 +274,6 @@
             <div class="chat-input-area">
                 <div id="mention-dropdown"></div>
 
-                <!-- + 버튼 클릭 팝업 메뉴 -->
                 <div id="attach-menu-dropdown">
                     <button class="attach-menu-item" onclick="triggerFileInput()">🖼️ 사진 전송</button>
                     <button class="attach-menu-item" onclick="startScreenShare()">💻 화면 공유</button>
@@ -335,7 +330,6 @@
                 </div>
             </div>
 
-            <!-- 화면 공유 전체화면 뷰어 모달 -->
             <div id="screen-viewer-modal">
                 <div class="screen-viewer-header">
                     <span id="screen-viewer-title" style="font-weight:bold;">화면 공유 시청 중</span>
@@ -358,10 +352,8 @@
         let isDarkMode = false;
         let cachedMembers = [];
 
-        // 알림 기능 변수
         let isNotificationEnabled = (localStorage.getItem('chat_noti_enabled') !== 'false');
 
-        // WebRTC 화면 공유 변수
         let localScreenStream = null;
         let peerConnections = {}; 
         let isSharingScreen = false;
@@ -371,7 +363,6 @@
 
         const AVAILABLE_REACTIONS = ['❤️', '👍', '✅', '😄', '😢', '🔥'];
 
-        // ================= 웹 알림 제어 로직 =================
         function updateNotiButtonUI() {
             const btn = document.getElementById('noti-toggle-btn');
             if (btn) {
@@ -406,11 +397,10 @@
             updateNotiButtonUI();
         }
 
-        // 안정적인 알림 발송 함수 (필터 조건 및 에러 유발 속성 배제)
         function triggerWebNotification(sender, text) {
             if (!isNotificationEnabled) return;
             if (!("Notification" in window) || Notification.permission !== 'granted') return;
-            if (sender === myUsername) return; // 내가 보낸 글은 제외
+            if (sender === myUsername) return;
 
             try {
                 const noti = new Notification(`[1-1 채팅] ${sender}`, {
@@ -427,7 +417,6 @@
             }
         }
 
-        // + 버튼 팝업 토글
         function toggleAttachMenu(e) {
             e.stopPropagation();
             const menu = document.getElementById('attach-menu-dropdown');
@@ -446,7 +435,6 @@
             document.getElementById('image-input').click();
         }
 
-        // ================= WebRTC 화면 공유 로직 =================
         async function startScreenShare() {
             document.getElementById('attach-menu-dropdown').style.display = 'none';
             if (isSharingScreen) {
@@ -500,7 +488,6 @@
             video.srcObject = null;
         }
 
-        // ================= 기본 UI 및 소켓 로직 =================
         function handleTitleClick() {
             titleClickCount++;
             if (titleClickCount >= 10) {
@@ -587,8 +574,6 @@
                     if (oldReadEl) oldReadEl.remove();
                 }
                 appendMessage(data, true, true);
-
-                // 새 메시지 수신 시 웹 알림 팝업 실행
                 triggerWebNotification(data.username, data.message || (data.image ? '[사진]' : ''));
             });
 
@@ -662,7 +647,6 @@
                 }
             });
 
-            // WebRTC 시그널링
             socket.on('screen_viewer_joined', async ({ viewerSocketId }) => {
                 if (!isSharingScreen || !localScreenStream) return;
                 const pc = new RTCPeerConnection(rtcConfig);
@@ -1176,6 +1160,7 @@
                 bubble.className = 'bubble';
                 bubble.innerHTML = formatMessageText(data.message);
 
+                // 화면 공유 알림 버튼
                 if (data.isScreenShareNotice && data.screenSharer) {
                     const btnContainer = document.createElement('div');
                     if (data.screenSharer === myUsername) {
@@ -1183,6 +1168,13 @@
                     } else {
                         btnContainer.innerHTML = `<button class="screen-share-btn" onclick="viewScreenShare('${data.screenSharer}')">📺 화면 공유 보기</button>`;
                     }
+                    bubble.appendChild(btnContainer);
+                }
+
+                // /game 게임 이동 링크 버튼 연동
+                if (data.isGameLink) {
+                    const btnContainer = document.createElement('div');
+                    btnContainer.innerHTML = `<button class="screen-share-btn game-btn" onclick="window.open('/game?username=' + encodeURIComponent(myUsername), '_blank')">🎮 게임으로 이동하기</button>`;
                     bubble.appendChild(btnContainer);
                 }
 
