@@ -27,16 +27,16 @@ const userIpMap = new Map();
 
 let currentScreenSharer = null;
 
-// ================= 마피아 전용 게임 상태 관리 =================
+// ================= 마피아 게임 상태 관리 =================
 let gameSockets = new Map(); // socketId -> username
 let mafiaGame = {
     isRunning: false,
     phase: 'idle', // 'idle' | 'roleReveal' | 'intro' | 'dayTalk' | 'dayVote' | 'night' | 'ended'
-    players: [],   // [{ socketId, username, role, isAlive, isSpectator }]
+    players: [],   // [{ socketId, username, role, isAlive }]
     introIndex: 0,
     timer: 0,
     interval: null,
-    votes: {},     // voter -> target
+    votes: {},     
     nightActions: { killTarget: null, healTarget: null }
 };
 
@@ -55,9 +55,16 @@ function clearMafiaTimers() {
 }
 
 function checkLobbyStart() {
+    const currentCount = gameSockets.size;
+
+    // 게임 중 누군가 나가서 4명 미만이 된 경우 게임 즉시 중단
+    if (mafiaGame.isRunning && currentCount < 4) {
+        abortMafiaGame('참가자가 나가 4명 미만이 되어 게임이 중단되었습니다.');
+        return;
+    }
+
     if (mafiaGame.isRunning) return;
 
-    const currentCount = gameSockets.size;
     io.emit('mafia_lobby_status', {
         currentCount,
         requiredCount: 4,
@@ -87,6 +94,15 @@ function checkLobbyStart() {
     }
 }
 
+function abortMafiaGame(reason) {
+    clearMafiaTimers();
+    mafiaGame.isRunning = false;
+    mafiaGame.phase = 'idle';
+    mafiaGame.players = [];
+    io.emit('mafia_game_aborted', { reason });
+    checkLobbyStart();
+}
+
 function startMafiaGame() {
     clearMafiaTimers();
     mafiaGame.isRunning = true;
@@ -95,17 +111,14 @@ function startMafiaGame() {
     mafiaGame.votes = {};
     mafiaGame.nightActions = { killTarget: null, healTarget: null };
 
-    // 접속한 소켓들로 플레이어 구성
     const entries = Array.from(gameSockets.entries());
     const players = entries.map(([sId, uName]) => ({
         socketId: sId,
         username: uName,
         role: '시민',
-        isAlive: true,
-        isSpectator: false
+        isAlive: true
     }));
 
-    // 역할 배정 (마피아 1, 경찰 1, 의사 1, 나머지 시민)
     const shuffled = [...players].sort(() => Math.random() - 0.5);
     const assignedRoles = ['마피아', '경찰', '의사'];
     assignedRoles.forEach((role, idx) => {
@@ -116,7 +129,6 @@ function startMafiaGame() {
 
     io.emit('mafia_game_started');
 
-    // 본인 역할 개별 전송
     mafiaGame.players.forEach(p => {
         io.to(p.socketId).emit('mafia_assigned_role', { role: p.role });
     });
@@ -495,7 +507,7 @@ async function handleBotCommands(commandText, senderUsername, replyToData = null
                 }
             }
         } catch (err) {
-            console.error('alldel 에러:', err);
+            console.error('alldel 처리 에러:', err);
         }
         return true;
     }
@@ -721,19 +733,23 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('mafia_intro_finish', () => {
-        if (!mafiaGame.isRunning) return;
-        mafiaGame.introIndex++;
-        startIntroPhase();
+        if (!mafiaGame.isRunning || mafiaGame.phase !== 'intro') return;
+        // 현재 발언자만 턴을 넘길 수 있음
+        const current = mafiaGame.players[mafiaGame.introIndex];
+        if (current && current.username === username) {
+            mafiaGame.introIndex++;
+            startIntroPhase();
+        }
     });
 
     socket.on('mafia_cast_vote', (target) => {
-        if (!mafiaGame.isRunning) return;
+        if (!mafiaGame.isRunning || mafiaGame.phase !== 'dayVote') return;
         mafiaGame.votes[username] = target;
         io.emit('mafia_vote_received', { voter: username });
     });
 
     socket.on('mafia_night_action', ({ action, target }) => {
-        if (!mafiaGame.isRunning) return;
+        if (!mafiaGame.isRunning || mafiaGame.phase !== 'night') return;
         if (action === 'kill') mafiaGame.nightActions.killTarget = target;
         if (action === 'heal') mafiaGame.nightActions.healTarget = target;
         if (action === 'investigate') {
@@ -745,10 +761,23 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // 인게임 채팅 (밤 또는 자기소개 턴 검증)
     socket.on('game_chat_message', (msgText) => {
         if (kickedUsers.has(username)) return;
 
-        // 관전자는 사망자나 미참가자처럼 구경만 가능 (채팅 입력 제한 가능하나 원활한 참여를 위해 말머리 부착)
+        // 1. 밤 페이즈 채팅 차단
+        if (mafiaGame.isRunning && mafiaGame.phase === 'night') {
+            return;
+        }
+
+        // 2. 자기소개 페이즈: 현재 턴인 사람만 채팅 가능
+        if (mafiaGame.isRunning && mafiaGame.phase === 'intro') {
+            const currentSpeaker = mafiaGame.players[mafiaGame.introIndex]?.username;
+            if (currentSpeaker !== username) {
+                return;
+            }
+        }
+
         const player = mafiaGame.players.find(p => p.username === username);
         const isDead = player && !player.isAlive;
 
