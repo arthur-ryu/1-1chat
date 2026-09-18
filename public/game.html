@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>게임 대기실</title>
+    <title>마피아 게임</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
@@ -17,14 +17,16 @@
         .chat-header { background-color: #1f1f1f; color: #fff; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .user-tag { color: #fee500; font-size: 11px; }
 
-        /* 대기실 투표 뷰 */
-        #lobby-view { flex: 1; display: flex; flex-direction: column; padding: 30px 20px; justify-content: center; align-items: center; gap: 20px; text-align: center; }
-        .vote-cards { display: flex; gap: 14px; width: 100%; max-width: 360px; }
-        .vote-card { flex: 1; background: #fff; border: 2px solid transparent; border-radius: 12px; padding: 24px 10px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .vote-card:hover { transform: translateY(-3px); }
-        .vote-card.selected { border-color: #3c1e1e; background: #fee500; }
-        .vote-count { font-size: 13px; color: #777; font-weight: bold; }
-        .timer-badge { font-size: 20px; font-weight: bold; color: #3c1e1e; background: rgba(0,0,0,0.06); padding: 8px 16px; border-radius: 20px; }
+        /* 대기실 뷰 */
+        #lobby-view { flex: 1; display: flex; flex-direction: column; padding: 30px 20px; justify-content: center; align-items: center; gap: 16px; text-align: center; }
+        .player-count-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); width: 100%; max-width: 320px; }
+        .count-text { font-size: 32px; font-weight: bold; color: #3c1e1e; margin: 10px 0; }
+        .timer-badge { font-size: 18px; font-weight: bold; color: #d9534f; }
+
+        /* 게임 진행 중 난입 차단 / 관전 안내 화면 */
+        #busy-view { flex: 1; display: none; flex-direction: column; padding: 30px 20px; justify-content: center; align-items: center; gap: 18px; text-align: center; }
+        .busy-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); width: 100%; max-width: 340px; }
+        .btn-spectate { padding: 12px 20px; background: #3c1e1e; color: #fff; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; margin-top: 12px; width: 100%; }
 
         /* 직업 룰렛 오버레이 */
         #roulette-overlay { position: absolute; inset: 0; background: #000; z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center; }
@@ -49,7 +51,6 @@
         .system.secret .bubble { background-color: #3c1e1e; color: #fee500; font-weight: bold; }
         .time { font-size: 9px; color: #777; margin-top: 2px; }
 
-        /* 하단 액션 버튼 트레이 */
         .action-tray { padding: 8px 10px; background: #e8e3d8; display: none; flex-wrap: wrap; gap: 6px; border-top: 1px solid rgba(0,0,0,0.05); }
         .game-btn { flex: 1; min-width: 75px; padding: 8px 10px; border-radius: 6px; border: none; font-weight: bold; font-size: 12px; cursor: pointer; background: #3c1e1e; color: #fff; }
         .game-btn.skip { background: #777; }
@@ -64,38 +65,37 @@
 
     <div class="container">
         <div class="chat-header">
-            <span id="room-title">게임 대기실</span>
+            <span id="room-title">마피아 게임</span>
             <span id="my-name-display" class="user-tag"></span>
         </div>
 
-        <!-- 1. 좌/우 투표 대기실 -->
+        <!-- 1. 대기실 (4인 모객) -->
         <div id="lobby-view">
-            <h2 style="color: #3c1e1e;">게임 선택 투표</h2>
-            <p style="color: #666; font-size: 13px;">투표수가 더 많은 게임으로 시작됩니다.</p>
-            
-            <div class="vote-cards">
-                <div class="vote-card" id="card-mafia" onclick="castVote('mafia')">
-                    <span style="font-size: 34px;">🕵️‍♂️</span>
-                    <h3>마피아</h3>
-                    <span class="vote-count" id="mafia-count">0표</span>
-                </div>
-                <div class="vote-card" id="card-headsup" onclick="castVote('headsUp')">
-                    <span style="font-size: 34px;">🃏</span>
-                    <h3>헤즈업</h3>
-                    <span class="vote-count" id="headsup-count">0표</span>
-                </div>
+            <div class="player-count-card">
+                <h3 style="color: #3c1e1e;">🕵️‍♂️ 마피아 대기실</h3>
+                <p style="color: #666; font-size: 12px; margin-top: 4px;">게임을 시작하려면 최소 4명이 필요합니다.</p>
+                <div class="count-text" id="lobby-player-count">1 / 4</div>
+                <div class="timer-badge" id="lobby-timer-badge">참가자 대기 중...</div>
             </div>
-
-            <div class="timer-badge" id="lobby-timer">10초 대기 중</div>
         </div>
 
-        <!-- 2. 직업 룰렛 오버레이 -->
+        <!-- 2. 게임 진행 중 난입 차단 / 관전 뷰 -->
+        <div id="busy-view">
+            <div class="busy-card">
+                <span style="font-size: 36px;">🔒</span>
+                <h3 style="color: #3c1e1e; margin-top: 8px;">게임이 이미 진행 중입니다</h3>
+                <p style="color: #666; font-size: 13px; margin-top: 6px;">현재 라운드가 종료될 때까지 새 게임을 시작할 수 없습니다.</p>
+                <button class="btn-spectate" onclick="spectateGame()">👀 실시간 채팅 관전하기</button>
+            </div>
+        </div>
+
+        <!-- 3. 직업 룰렛 오버레이 -->
         <div id="roulette-overlay">
             <div class="roulette-box" id="roulette-text">시민</div>
             <div class="roulette-sub">직업을 배정받는 중입니다...</div>
         </div>
 
-        <!-- 3. 인게임 메인 뷰 -->
+        <!-- 4. 인게임 메인 화면 -->
         <div id="ingame-view">
             <div class="game-status-bar">
                 <span id="game-phase-name">게임 준비 중</span>
@@ -120,33 +120,50 @@
 
         const socket = io({ query: { username: myUsername } });
         let myRole = '';
-        let currentGame = null;
+        let isSpectating = false;
 
-        function castVote(type) {
-            document.querySelectorAll('.vote-card').forEach(c => c.classList.remove('selected'));
-            document.getElementById(`card-${type.toLowerCase()}`).classList.add('selected');
-            socket.emit('game_vote', type);
+        // 대기실 입장 등록
+        socket.emit('join_game_lobby');
+
+        socket.on('mafia_lobby_status', ({ currentCount, requiredCount, canStart }) => {
+            document.getElementById('lobby-player-count').innerText = `${currentCount} / ${requiredCount}`;
+            if (!canStart) {
+                document.getElementById('lobby-timer-badge').innerText = `최소 ${requiredCount}명이 모여야 시작됩니다.`;
+            }
+        });
+
+        socket.on('mafia_lobby_timer', (t) => {
+            const badge = document.getElementById('lobby-timer-badge');
+            if (t !== null) {
+                badge.innerText = `⏳ ${t}초 후 자동으로 게임이 시작됩니다!`;
+            }
+        });
+
+        // 이미 게임 중인 방 접속 시
+        socket.on('game_already_running', () => {
+            document.getElementById('lobby-view').style.display = 'none';
+            document.getElementById('busy-view').style.display = 'flex';
+        });
+
+        function spectateGame() {
+            isSpectating = true;
+            document.getElementById('busy-view').style.display = 'none';
+            document.getElementById('ingame-view').style.display = 'flex';
+            document.getElementById('room-title').innerText = '마피아 게임 (관전 모드)';
+            appendSystemMessage('👀 관전 모드로 입장하였습니다. 실시간 대화를 구경할 수 있습니다.');
+            socket.emit('join_as_spectator');
         }
 
-        socket.on('game_votes_updated', ({ mafia, headsUp }) => {
-            document.getElementById('mafia-count').innerText = `${mafia}표`;
-            document.getElementById('headsup-count').innerText = `${headsUp}표`;
-        });
-
-        socket.on('game_lobby_timer', (t) => {
-            document.getElementById('lobby-timer').innerText = `${t}초 뒤 시작`;
-        });
-
-        socket.on('game_started', ({ game, title }) => {
-            currentGame = game;
-            document.getElementById('room-title').innerText = title;
+        socket.on('mafia_game_started', () => {
             document.getElementById('lobby-view').style.display = 'none';
+            document.getElementById('busy-view').style.display = 'none';
             document.getElementById('ingame-view').style.display = 'flex';
+            document.getElementById('game-messages').innerHTML = ''; // 이전 게임 메시지 완전 초기화
         });
 
-        // ================= 마피아 게임 로직 =================
+        // 역할 룰렛
         socket.on('mafia_assigned_role', ({ role }) => {
-            if (currentGame !== 'mafia') return;
+            if (isSpectating) return;
             myRole = role;
             const overlay = document.getElementById('roulette-overlay');
             const rText = document.getElementById('roulette-text');
@@ -165,14 +182,14 @@
             }, 100);
         });
 
+        // 자기소개 페이즈
         socket.on('mafia_turn_intro', ({ currentSpeaker, index, total }) => {
-            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = `자기소개 페이즈 (${index + 1}/${total})`;
             appendSystemMessage(`📢 [자기소개] @${currentSpeaker} 님의 턴입니다.`);
 
             const tray = document.getElementById('action-tray');
             tray.innerHTML = '';
-            if (currentSpeaker === myUsername) {
+            if (currentSpeaker === myUsername && !isSpectating) {
                 tray.style.display = 'flex';
                 tray.innerHTML = `<button class="game-btn" onclick="finishIntro()">자기소개 마치기</button>`;
             } else {
@@ -185,17 +202,19 @@
             socket.emit('mafia_intro_finish');
         }
 
+        // 자유 토론 페이즈
         socket.on('mafia_day_talk_start', () => {
-            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = '자유 토론';
             document.getElementById('action-tray').style.display = 'none';
-            appendSystemMessage('☀️ 20초간 자유 토론이 시작되었습니다!');
+            appendSystemMessage('☀️ 아침이 밝았습니다! 20초간 의심되는 대상을 토론하세요.');
         });
 
+        // 처형 투표 페이즈
         socket.on('mafia_vote_phase_start', ({ candidates }) => {
-            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = '처형 투표';
-            appendSystemMessage('🗳️ 의심되는 사람에게 투표하세요. (skip 가능)');
+            appendSystemMessage('🗳️ 투표가 시작되었습니다! 의심되는 사람 또는 skip을 선택하세요.');
+
+            if (isSpectating) return;
 
             const tray = document.getElementById('action-tray');
             tray.innerHTML = '';
@@ -212,20 +231,20 @@
         }
 
         socket.on('mafia_executed', ({ username, role }) => {
-            if (currentGame !== 'mafia') return;
             if (username) appendSystemMessage(`⚖️ 투표 결과, @${username} (${role}) 님이 처형되었습니다.`);
-            else appendSystemMessage(`⚖️ 스킵되었거나 동점으로 처형자가 없습니다.`);
+            else appendSystemMessage(`⚖️ 동점 또는 스킵으로 인해 아무도 처형되지 않았습니다.`);
         });
 
+        // 밤 페이즈
         socket.on('mafia_night_start', ({ candidates }) => {
-            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-name').innerText = '밤 페이즈 (스킬 사용)';
             appendSystemMessage('🌙 밤이 되었습니다.');
+
+            if (isSpectating) return;
 
             const tray = document.getElementById('action-tray');
             tray.innerHTML = '';
 
-            // 직업을 가진 사람에게만 스킬 버튼 노출
             if (myRole === '마피아') {
                 tray.style.display = 'flex';
                 candidates.forEach(u => {
@@ -252,56 +271,35 @@
             socket.emit('mafia_night_action', { action, target });
         }
 
-        // 경찰 본인 소켓만 수신하는 비밀 조사 결과
+        // 경찰 비밀 조사 결과
         socket.on('mafia_investigate_private_result', ({ target, isMafia }) => {
-            if (currentGame !== 'mafia') return;
             appendSystemMessage(`🔍 [나에게만 보이는 조사 결과] @${target} 님은 ${isMafia ? '마피아가 맞습니다! 🚨' : '선량한 시민입니다. ✅'}`, true);
         });
 
         socket.on('mafia_night_result', ({ killed }) => {
-            if (currentGame !== 'mafia') return;
-            if (killed) appendSystemMessage(`⚰️ 지난 밤, @${killed} 님이 사망하였습니다.`);
-            else appendSystemMessage(`🛡️ 지난 밤에는 아무도 사망하지 않았습니다!`);
+            if (killed) appendSystemMessage(`⚰️ 지난 밤, @${killed} 님이 마피아의 공격으로 사망하였습니다.`);
+            else appendSystemMessage(`🛡️ 의사의 치료 또는 공격 불발로 아무도 사망하지 않았습니다!`);
         });
 
         socket.on('mafia_timer_update', ({ timer }) => {
-            if (currentGame !== 'mafia') return;
             document.getElementById('game-phase-timer').innerText = `${timer}초`;
         });
 
-        // ================= 헤즈업 게임 로직 =================
-        socket.on('headsup_suggest_phase', ({ targetUser, timer }) => {
-            if (currentGame !== 'headsUp') return;
-            document.getElementById('game-phase-name').innerText = '제시어 상의 (10초)';
-            if (targetUser === myUsername) {
-                appendSystemMessage(`🃏 당신이 이번 턴의 술래입니다! 다른 유저들이 제시어를 정하고 있습니다.`);
-            } else {
-                appendSystemMessage(`💡 술래는 @${targetUser} 님입니다. 채팅으로 제시어를 추천하세요!`);
-            }
+        socket.on('mafia_game_ended', ({ resultText }) => {
+            appendSystemMessage(`🏁 [게임 종료] ${resultText}`);
+            document.getElementById('game-phase-name').innerText = '게임 종료';
+            document.getElementById('action-tray').style.display = 'none';
+            setTimeout(() => {
+                location.reload(); // 새 라운드를 위해 5초 뒤 대기실 재접속
+            }, 5000);
         });
 
-        socket.on('headsup_explain_start', ({ targetUser, word }) => {
-            if (currentGame !== 'headsUp') return;
-            document.getElementById('game-phase-name').innerText = '설명 턴';
-            if (targetUser === myUsername) {
-                appendSystemMessage(`🙈 당신은 술래입니다! 다른 사람들의 설명을 듣고 정답을 맞혀보세요.`);
-            } else {
-                appendSystemMessage(`🎯 확정 제시어: [ ${word} ] ! 술래에게 들키지 않게 설명하세요!`);
-            }
-        });
-
-        socket.on('headsup_timer_update', ({ timer }) => {
-            if (currentGame !== 'headsUp') return;
-            document.getElementById('game-phase-timer').innerText = `${timer}초`;
-        });
-
-        // ================= 채팅 메시지 렌더링 =================
+        // 인게임 대화
         function sendGameChat() {
             const input = document.getElementById('game-chat-input');
             const val = input.value.trim();
             if (!val) return;
             socket.emit('game_chat_message', val);
-            if (currentGame === 'headsUp') socket.emit('headsup_suggest_word', val);
             input.value = '';
         }
 
