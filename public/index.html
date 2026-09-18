@@ -26,10 +26,9 @@
 
         #chat-screen { display: none; flex-direction: column; height: 100%; position: relative; }
         .chat-header { background-color: #1f1f1f; color: #fff; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        .header-btn-group { display: flex; gap: 6px; align-items: center; }
         
-        #user-list-btn, #noti-toggle-btn { background: #333; color: #fff; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
-        #user-list-btn:hover, #noti-toggle-btn:hover { background: #444; }
+        #user-list-btn { background: #333; color: #fff; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+        #user-list-btn:hover { background: #444; }
 
         .chat-messages-wrapper { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -202,7 +201,7 @@
 
         .container.dark-mode { background-color: #18191a !important; color: #e4e6eb !important; }
         .container.dark-mode .chat-header { background-color: #242526 !important; color: #e4e6eb !important; }
-        .container.dark-mode #user-list-btn, .container.dark-mode #noti-toggle-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
+        .container.dark-mode #user-list-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
         .container.dark-mode .chat-messages { background-color: #18191a !important; }
         .container.dark-mode .other .bubble { background-color: #242526 !important; color: #e4e6eb !important; }
         .container.dark-mode .mine .bubble { background-color: #d29922 !important; color: #000 !important; }
@@ -256,10 +255,7 @@
         <div id="chat-screen">
             <div class="chat-header">
                 <span id="room-title" onclick="handleTitleClick()" style="cursor: pointer;">1-1 채팅</span>
-                <div class="header-btn-group">
-                    <button id="noti-toggle-btn" onclick="toggleNotification()">🔔 알림 켜짐</button>
-                    <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
-                </div>
+                <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
             </div>
             
             <div class="chat-messages-wrapper">
@@ -352,8 +348,6 @@
         let isDarkMode = false;
         let cachedMembers = [];
 
-        let isNotificationEnabled = (localStorage.getItem('chat_noti_enabled') !== 'false');
-
         let localScreenStream = null;
         let peerConnections = {}; 
         let isSharingScreen = false;
@@ -362,60 +356,6 @@
         };
 
         const AVAILABLE_REACTIONS = ['❤️', '👍', '✅', '😄', '😢', '🔥'];
-
-        function updateNotiButtonUI() {
-            const btn = document.getElementById('noti-toggle-btn');
-            if (btn) {
-                btn.innerText = isNotificationEnabled ? '🔔 알림 켜짐' : '🔕 알림 꺼짐';
-                btn.style.opacity = isNotificationEnabled ? '1' : '0.6';
-            }
-        }
-
-        async function toggleNotification() {
-            if (!("Notification" in window)) {
-                alert('현재 브라우저는 웹 알림을 지원하지 않습니다.');
-                return;
-            }
-
-            if (!isNotificationEnabled) {
-                if (Notification.permission === 'default') {
-                    const permission = await Notification.requestPermission();
-                    if (permission !== 'granted') {
-                        alert('브라우저 설정에서 알림 권한을 허용해야 알림을 받을 수 있습니다.');
-                        return;
-                    }
-                } else if (Notification.permission === 'denied') {
-                    alert('브라우저에서 알림이 차단되어 있습니다. 브라우저 주소창 왼쪽 설정 아이콘에서 알림을 허용해주세요.');
-                    return;
-                }
-                isNotificationEnabled = true;
-            } else {
-                isNotificationEnabled = false;
-            }
-
-            localStorage.setItem('chat_noti_enabled', isNotificationEnabled ? 'true' : 'false');
-            updateNotiButtonUI();
-        }
-
-        function triggerWebNotification(sender, text) {
-            if (!isNotificationEnabled) return;
-            if (!("Notification" in window) || Notification.permission !== 'granted') return;
-            if (sender === myUsername) return;
-
-            try {
-                const noti = new Notification(`[1-1 채팅] ${sender}`, {
-                    body: text || '[사진]',
-                    silent: false
-                });
-
-                noti.onclick = () => {
-                    window.focus();
-                    noti.close();
-                };
-            } catch (err) {
-                console.error('웹 알림 전송 에러:', err);
-            }
-        }
 
         function toggleAttachMenu(e) {
             e.stopPropagation();
@@ -455,7 +395,7 @@
                     stopScreenShare();
                 };
             } catch (err) {
-                console.error('화면 공유 권한 거부 또는 실패:', err);
+                console.error('화면 공유 실패:', err);
             }
         }
 
@@ -500,7 +440,6 @@
         function formatRelativeTime(timestamp, isOnline) {
             if (isOnline) return '현재 활동 중';
             if (!timestamp) return '활동 기록 없음';
-            
             const diffSeconds = Math.floor((Date.now() - timestamp) / 1000);
             if (diffSeconds < 60) return '방금전 활동';
             const diffMinutes = Math.floor(diffSeconds / 60);
@@ -544,7 +483,6 @@
                 myUsername = username;
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('chat-screen').style.display = 'flex';
-                updateNotiButtonUI();
                 initSocket();
             } else {
                 document.getElementById('auth-error').innerText = data.message;
@@ -574,14 +512,11 @@
                     if (oldReadEl) oldReadEl.remove();
                 }
                 appendMessage(data, true, true);
-                triggerWebNotification(data.username, data.message || (data.image ? '[사진]' : ''));
             });
 
             socket.on('message_read_updated', ({ messageId, readBy }) => {
                 const msgEl = document.getElementById(`msg-${messageId}`);
-                if (msgEl) {
-                    updateReadStatusElement(msgEl, readBy);
-                }
+                if (msgEl) updateReadStatusElement(msgEl, readBy);
             });
 
             socket.on('message_deleted', (messageId) => {
@@ -593,9 +528,7 @@
                 const msgEl = document.getElementById(`msg-${messageId}`);
                 if (msgEl) {
                     const container = msgEl.querySelector('.reaction-container');
-                    if (container) {
-                        renderReactions(container, reactions, getMessageData(msgEl));
-                    }
+                    if (container) renderReactions(container, reactions, getMessageData(msgEl));
                 }
             });
 
@@ -619,7 +552,6 @@
                 allMembers.forEach(member => {
                     const li = document.createElement('li');
                     const isOnline = currentOnlineUserSet.has(member.username);
-                    
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'user-name-span';
                     nameSpan.classList.add(isOnline ? 'online-dot' : 'offline-dot');
@@ -638,92 +570,57 @@
             socket.on('update_typing', (users) => {
                 const otherTyping = users.filter(u => u !== myUsername);
                 const noticeEl = document.getElementById('typing-notice');
-                if (otherTyping.length === 0) {
-                    noticeEl.innerText = '';
-                } else if (otherTyping.length === 1) {
-                    noticeEl.innerText = `${otherTyping[0]}님이 입력 중입니다...`;
-                } else {
-                    noticeEl.innerText = `${otherTyping[0]}님 외 ${otherTyping.length - 1}명이 입력 중입니다...`;
-                }
+                if (otherTyping.length === 0) noticeEl.innerText = '';
+                else if (otherTyping.length === 1) noticeEl.innerText = `${otherTyping[0]}님이 입력 중입니다...`;
+                else noticeEl.innerText = `${otherTyping[0]}님 외 ${otherTyping.length - 1}명이 입력 중입니다...`;
             });
 
             socket.on('screen_viewer_joined', async ({ viewerSocketId }) => {
                 if (!isSharingScreen || !localScreenStream) return;
                 const pc = new RTCPeerConnection(rtcConfig);
                 peerConnections[viewerSocketId] = pc;
-
-                localScreenStream.getTracks().forEach(track => {
-                    pc.addTrack(track, localScreenStream);
-                });
-
+                localScreenStream.getTracks().forEach(track => pc.addTrack(track, localScreenStream));
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
-                        socket.emit('screen_ice_candidate', {
-                            targetSocketId: viewerSocketId,
-                            candidate: event.candidate
-                        });
+                        socket.emit('screen_ice_candidate', { targetSocketId: viewerSocketId, candidate: event.candidate });
                     }
                 };
-
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                socket.emit('screen_offer', {
-                    viewerSocketId,
-                    offer
-                });
+                socket.emit('screen_offer', { viewerSocketId, offer });
             });
 
             socket.on('screen_offer_received', async ({ sharerSocketId, offer }) => {
                 const pc = new RTCPeerConnection(rtcConfig);
                 peerConnections[sharerSocketId] = pc;
-
                 pc.ontrack = (event) => {
                     const video = document.getElementById('screen-video-element');
-                    if (event.streams && event.streams[0]) {
-                        video.srcObject = event.streams[0];
-                    }
+                    if (event.streams && event.streams[0]) video.srcObject = event.streams[0];
                 };
-
                 pc.onicecandidate = (event) => {
                     if (event.candidate) {
-                        socket.emit('screen_ice_candidate', {
-                            targetSocketId: sharerSocketId,
-                            candidate: event.candidate
-                        });
+                        socket.emit('screen_ice_candidate', { targetSocketId: sharerSocketId, candidate: event.candidate });
                     }
                 };
-
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-
-                socket.emit('screen_answer', {
-                    sharerSocketId,
-                    answer
-                });
+                socket.emit('screen_answer', { sharerSocketId, answer });
             });
 
             socket.on('screen_answer_received', async ({ viewerSocketId, answer }) => {
                 const pc = peerConnections[viewerSocketId];
-                if (pc) {
-                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-                }
+                if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
             });
 
             socket.on('screen_ice_candidate_received', async ({ senderSocketId, candidate }) => {
                 const pc = peerConnections[senderSocketId];
                 if (pc) {
-                    try {
-                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                    } catch (e) {
-                        console.error('ICE 후보 추가 오류:', e);
-                    }
+                    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
                 }
             });
 
-            socket.on('screen_share_closed', () => {
-                closeScreenViewer();
-            });
+            socket.on('screen_share_closed', () => closeScreenViewer());
         }
 
         function getMessageData(msgEl) {
@@ -748,16 +645,13 @@
         function handleTyping() {
             socket.emit('typing', true);
             clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => {
-                socket.emit('typing', false);
-            }, 1500);
+            typingTimer = setTimeout(() => socket.emit('typing', false), 1500);
         }
 
         function checkMentionTrigger() {
             const input = document.getElementById('message-input');
             const val = input.value;
             const pos = input.selectionStart;
-            
             const textBeforeCursor = val.substring(0, pos);
             const lastAtIndex = textBeforeCursor.lastIndexOf('@');
             const dropdown = document.getElementById('mention-dropdown');
@@ -775,20 +669,16 @@
         function showMentionDropdown(query, atIndex) {
             const dropdown = document.getElementById('mention-dropdown');
             dropdown.innerHTML = '';
-            
             const filtered = cachedMembers.filter(m => m.toLowerCase().includes(query.toLowerCase()));
             if (filtered.length === 0) {
                 dropdown.style.display = 'none';
                 return;
             }
-            
             filtered.forEach(name => {
                 const item = document.createElement('div');
                 item.className = 'mention-item';
                 item.innerText = '@' + name;
-                item.onclick = () => {
-                    insertMention(name, atIndex);
-                };
+                item.onclick = () => insertMention(name, atIndex);
                 dropdown.appendChild(item);
             });
             dropdown.style.display = 'block';
@@ -798,32 +688,25 @@
             const input = document.getElementById('message-input');
             const val = input.value;
             const pos = input.selectionStart;
-            
             const before = val.substring(0, atIndex);
             const after = val.substring(pos);
-            
             input.value = before + '@' + username + ' ' + after;
             input.focus();
             const newPos = atIndex + username.length + 2;
             input.setSelectionRange(newPos, newPos);
-            
             document.getElementById('mention-dropdown').style.display = 'none';
         }
 
         function handleKeyDown(event) {
             const dropdown = document.getElementById('mention-dropdown');
             if (dropdown.style.display === 'flex' || dropdown.style.display === 'block') {
-                if (event.key === 'Escape') {
-                    dropdown.style.display = 'none';
-                }
+                if (event.key === 'Escape') dropdown.style.display = 'none';
             }
             if (event.isComposing || event.keyCode === 229) return;
             if (event.key === 'Enter') {
                 if (event.shiftKey) return;
-                else {
-                    event.preventDefault();
-                    sendMessage();
-                }
+                event.preventDefault();
+                sendMessage();
             }
         }
 
@@ -838,7 +721,6 @@
         function handleScroll() {
             const chatMessages = document.getElementById('chat-messages');
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
-            
             if (distanceToBottom > 30) {
                 document.getElementById('scroll-bottom-btn').style.display = 'flex';
             } else {
@@ -853,11 +735,9 @@
             const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
             if (distanceToBottom <= 30) {
                 const lastMsg = chatMessages.lastElementChild;
-                if (lastMsg && lastMsg.dataset.id) {
-                    if (lastMarkedMessageId !== lastMsg.dataset.id) {
-                        lastMarkedMessageId = lastMsg.dataset.id;
-                        socket.emit('mark_read', lastMsg.dataset.id);
-                    }
+                if (lastMsg && lastMsg.dataset.id && lastMarkedMessageId !== lastMsg.dataset.id) {
+                    lastMarkedMessageId = lastMsg.dataset.id;
+                    socket.emit('mark_read', lastMsg.dataset.id);
                 }
             }
         }
@@ -869,10 +749,7 @@
 
             const now = new Date();
             const timeString = now.toLocaleTimeString('ko-KR', {
-                timeZone: 'Asia/Seoul',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
+                timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: true
             });
 
             socket.emit('send_message', {
@@ -896,10 +773,7 @@
                 reader.onload = function(e) {
                     const now = new Date();
                     const timeString = now.toLocaleTimeString('ko-KR', {
-                        timeZone: 'Asia/Seoul',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
+                        timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: true
                     });
 
                     socket.emit('send_message', {
@@ -930,9 +804,7 @@
 
         function jumpToOriginalMessage(targetId, targetUsername, targetText) {
             let targetEl = null;
-            if (targetId) {
-                targetEl = document.getElementById(`msg-${targetId}`);
-            }
+            if (targetId) targetEl = document.getElementById(`msg-${targetId}`);
             if (!targetEl) {
                 const allBoxes = document.querySelectorAll('.message-box');
                 for (let box of allBoxes) {
@@ -1037,15 +909,10 @@
             }
 
             const othersWhoRead = (readBy || []).filter(u => u !== myUsername);
-            if (othersWhoRead.length === 0) {
-                readEl.innerText = '';
-            } else if (othersWhoRead.length === 1) {
-                readEl.innerText = `${othersWhoRead[0]} 읽음`;
-            } else if (othersWhoRead.length === 2) {
-                readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 읽음`;
-            } else {
-                readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 외 ${othersWhoRead.length - 2}명 읽음`;
-            }
+            if (othersWhoRead.length === 0) readEl.innerText = '';
+            else if (othersWhoRead.length === 1) readEl.innerText = `${othersWhoRead[0]} 읽음`;
+            else if (othersWhoRead.length === 2) readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 읽음`;
+            else readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 외 ${othersWhoRead.length - 2}명 읽음`;
         }
 
         function formatMessageText(text) {
@@ -1053,10 +920,7 @@
             const div = document.createElement('div');
             div.textContent = text;
             let escaped = div.innerHTML;
-            
-            escaped = escaped.replace(/@([^\s]+)/g, (match) => {
-                return `<span class="mention-highlight">${match}</span>`;
-            });
+            escaped = escaped.replace(/@([^\s]+)/g, (match) => `<span class="mention-highlight">${match}</span>`);
             return escaped;
         }
 
@@ -1069,18 +933,13 @@
 
                 const badge = document.createElement('div');
                 badge.className = 'reaction-badge';
-                const isMyReaction = users.includes(myUsername);
-                if (isMyReaction) {
-                    badge.classList.add('my-reaction');
-                }
+                if (users.includes(myUsername)) badge.classList.add('my-reaction');
 
                 badge.innerHTML = `<span>${emoji}</span><span>${users.length}</span>`;
-
                 badge.onclick = (e) => {
                     e.stopPropagation();
                     handleReactionBadgeClick(messageData._id, emoji, reactions);
                 };
-
                 badge.oncontextmenu = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1094,9 +953,7 @@
                         showReactionDetail(emoji, users);
                     }, 600);
                 };
-                badge.ontouchend = () => {
-                    clearTimeout(pressTimer);
-                };
+                badge.ontouchend = () => clearTimeout(pressTimer);
 
                 containerEl.appendChild(badge);
             }
@@ -1126,16 +983,10 @@
             let pressTimer;
             box.ontouchstart = (e) => {
                 if (e.target.closest('.reaction-badge') || e.target.closest('.screen-share-btn')) return;
-                pressTimer = setTimeout(() => {
-                    openChatMenu(data);
-                }, 600);
+                pressTimer = setTimeout(() => openChatMenu(data), 600);
             };
-            box.ontouchend = () => {
-                clearTimeout(pressTimer);
-            };
-            box.ontouchmove = () => {
-                clearTimeout(pressTimer);
-            };
+            box.ontouchend = () => clearTimeout(pressTimer);
+            box.ontouchmove = () => clearTimeout(pressTimer);
 
             if (!isMine) {
                 const nameDiv = document.createElement('div');
@@ -1160,7 +1011,6 @@
                 bubble.className = 'bubble';
                 bubble.innerHTML = formatMessageText(data.message);
 
-                // 화면 공유 알림 버튼
                 if (data.isScreenShareNotice && data.screenSharer) {
                     const btnContainer = document.createElement('div');
                     if (data.screenSharer === myUsername) {
@@ -1171,7 +1021,6 @@
                     bubble.appendChild(btnContainer);
                 }
 
-                // /game 게임 이동 링크 버튼 연동
                 if (data.isGameLink) {
                     const btnContainer = document.createElement('div');
                     btnContainer.innerHTML = `<button class="screen-share-btn game-btn" onclick="window.open('/game?username=' + encodeURIComponent(myUsername), '_blank')">🎮 게임으로 이동하기</button>`;
@@ -1200,9 +1049,7 @@
 
             chatMessages.appendChild(box);
 
-            if (isLastMessage) {
-                updateReadStatusElement(box, data.readBy);
-            }
+            if (isLastMessage) updateReadStatusElement(box, data.readBy);
 
             if (!isNewMessage || !isScrolledUp) {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
