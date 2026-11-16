@@ -9,9 +9,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
         body { background-color: #abc1d1; display: flex; justify-content: center; align-items: center; height: 100vh; height: 100dvh; }
         
-        .container { width: 100%; max-width: 480px; height: 100%; max-height: 100vh; background-color: #efeae2; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .container { width: 100%; max-width: 480px; height: 100%; max-height: 100vh; background-color: #efeae2; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; overflow: hidden; }
         @media (min-width: 481px) {
-            .container { height: 85vh; max-height: 750px; border-radius: 12px; overflow: hidden; }
+            .container { height: 85vh; max-height: 750px; border-radius: 12px; }
         }
         
         #auth-screen { padding: 30px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; background: #fee500; }
@@ -24,12 +24,53 @@
         .btn-signup { background-color: #fff; color: #3c1e1e; }
         .error-msg { color: #d9534f; margin-top: 10px; font-size: 13px; text-align: center; }
 
+        /* 메인 채팅 화면 및 탭 관리 */
         #chat-screen { display: none; flex-direction: column; height: 100%; position: relative; }
+        .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; position: relative; }
+        .tab-content.active { display: flex; }
+
         .chat-header { background-color: #1f1f1f; color: #fff; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        
         #user-list-btn { background: #333; color: #fff; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
         #user-list-btn:hover { background: #444; }
 
+        /* 하단 네비게이션 바 스타일 */
+        .bottom-nav { height: 55px; background: #fff; border-top: 1px solid #ddd; display: flex; justify-content: space-around; align-items: center; flex-shrink: 0; }
+        .nav-tab-btn { background: none; border: none; font-size: 14px; font-weight: bold; color: #777; cursor: pointer; flex: 1; height: 100%; display: flex; justify-content: center; align-items: center; }
+        .nav-tab-btn.active { color: #3c1e1e; border-top: 3px solid #fee500; background: #fafafa; }
+
+        /* 친구 탭 화면 스타일 */
+        #friend-tab { padding: 15px; background: #f9f9f9; overflow-y: auto; }
+        .friend-top-box { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .friend-top-info h3 { font-size: 16px; color: #333; margin-bottom: 4px; }
+        .friend-top-info p { font-size: 13px; color: #666; }
+        .add-friend-btn { background: #fee500; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        
+        .friend-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .friend-item { background: #fff; padding: 10px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .friend-name { font-size: 14px; font-weight: bold; color: #333; }
+        .chat-go-btn { background: #1877f2; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
+
+        /* 메시지 탭 (방 목록) 스타일 */
+        #message-tab { background: #fff; overflow-y: auto; }
+        .room-list { list-style: none; display: flex; flex-direction: column; }
+        .room-item { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .room-item:hover { background: #fafafa; }
+        .room-item-left { display: flex; flex-direction: column; gap: 4px; }
+        .room-name { font-size: 15px; font-weight: bold; color: #333; }
+        .room-last-msg { font-size: 13px; color: #777; }
+        .unread-badge { background: #d9534f; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
+
+        /* 모달 공통 스타일 */
+        .custom-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+        .custom-modal-content { background: #fff; width: 90%; max-width: 340px; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .custom-modal-content h3 { font-size: 16px; color: #333; }
+        .custom-modal-content input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+        .modal-btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 5px; }
+        .modal-btn-row button { padding: 8px 14px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .modal-btn-cancel { background: #ddd; color: #333; }
+        .modal-btn-ok { background: #fee500; color: #3c1e1e; }
+
+        /* 기존 채팅방 내부 CSS 유지 */
         .chat-messages-wrapper { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
         
@@ -43,127 +84,18 @@
         .other .bubble { background-color: #fff; color: #000; border-top-left-radius: 2px; }
         
         .time { font-size: 9px; color: #777; margin-top: 2px; align-self: flex-end; }
-        .mine .time { align-self: flex-end; }
-        .other .time { align-self: flex-end; }
         .read-status { font-size: 10px; color: #888; margin-top: 2px; }
         .mine .read-status { align-self: flex-end; }
         .other .read-status { align-self: flex-start; }
 
         .reply-quote { background: rgba(0,0,0,0.06); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #444; margin-bottom: 4px; border-left: 3px solid #3c1e1e; cursor: pointer; user-select: none; }
-        .reply-quote:hover { background: rgba(0,0,0,0.12); }
         .chat-image { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 4px; display: block; }
-
-        @keyframes highlightFlash {
-            0% { transform: scale(1); filter: brightness(1); }
-            50% { transform: scale(1.03); filter: brightness(1.2); }
-            100% { transform: scale(1); filter: brightness(1); }
-        }
-        .highlight-target { animation: highlightFlash 0.7s ease-in-out; }
-
-        .screen-share-btn {
-            display: inline-block;
-            margin-top: 6px;
-            padding: 5px 12px;
-            background: #1877f2;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .screen-share-btn.stop { background: #d9534f; }
-        .screen-share-btn.game-btn { background: #28a745; }
-        .screen-share-btn:hover { opacity: 0.9; }
-
-        #attach-menu-dropdown {
-            display: none;
-            position: absolute;
-            bottom: 60px;
-            left: 10px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            z-index: 50;
-            overflow: hidden;
-            flex-direction: column;
-            width: 140px;
-        }
-        .attach-menu-item {
-            padding: 10px 14px;
-            font-size: 13px;
-            font-weight: bold;
-            color: #333;
-            background: none;
-            border: none;
-            text-align: left;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .attach-menu-item:last-child { border-bottom: none; }
-        .attach-menu-item:hover { background: #f5f5f5; }
-
-        .reaction-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-        .mine .reaction-container { justify-content: flex-end; }
-        .other .reaction-container { justify-content: flex-start; }
-        .reaction-badge { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 2px 6px; font-size: 11px; display: flex; align-items: center; gap: 3px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); user-select: none; }
-        .reaction-badge.my-reaction { background: #eef3fc; border-color: #1877f2; }
 
         .chat-input-area { padding: 10px; background-color: #f0f0f0; display: flex; flex-direction: column; gap: 6px; position: relative; }
         .input-row { display: flex; gap: 8px; align-items: center; width: 100%; }
         .btn-attach { background: #ddd; border: none; width: 36px; height: 36px; border-radius: 4px; font-weight: bold; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; color: #555; }
-        .btn-attach:hover { background: #ccc; }
         .chat-input-area textarea { flex: 1; padding: 10px; border: none; border-radius: 4px; font-size: 14px; outline: none; resize: none; height: 38px; line-height: 18px; }
         .chat-input-area button.send-btn { padding: 10px 16px; background-color: #fee500; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; height: 38px; }
-
-        #reply-preview-bar { display: none; justify-content: space-between; align-items: center; background: #e4dfd5; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: #333; }
-        #reply-preview-bar button { background: none; border: none; font-weight: bold; cursor: pointer; color: #777; }
-        #typing-notice { font-size: 11px; color: #666; padding: 0 4px; min-height: 16px; }
-
-        #new-message-banner { display: none; position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(31, 31, 31, 0.9); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; align-items: center; gap: 6px; }
-        #scroll-bottom-btn { display: none; position: absolute; bottom: 15px; right: 15px; background: #ffffff; color: #333; border: 1px solid #ccc; width: 36px; height: 36px; border-radius: 50%; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10; justify-content: center; align-items: center; }
-        #scroll-bottom-btn:hover { background: #f0f0f0; }
-
-        #screen-viewer-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.92);
-            z-index: 999;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .screen-viewer-header {
-            width: 100%;
-            padding: 12px 20px;
-            color: #fff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0,0,0,0.4);
-            position: absolute;
-            top: 0;
-        }
-        #screen-video-element {
-            max-width: 95vw;
-            max-height: 85vh;
-            border-radius: 8px;
-            background: #000;
-        }
-        .viewer-close-btn {
-            background: #d9534f;
-            border: none;
-            color: #fff;
-            padding: 6px 14px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-        }
 
         #user-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 20; }
         .modal-content { background: #fff; width: 85%; max-width: 300px; height: 75%; max-height: 400px; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -171,72 +103,13 @@
         .modal-section-title { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
         .modal-user-list { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #444; }
         .modal-user-list li { padding: 6px 8px; background: #f9f9f9; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
-        .user-name-span { display: flex; align-items: center; gap: 6px; }
-        .online-dot::before { content: "●"; color: #2ecc71; font-size: 10px; }
-        .offline-dot::before { content: "●"; color: #bbb; font-size: 10px; }
-        .user-time-span { font-size: 11px; color: #888; }
         .modal-close-btn { align-self: flex-end; padding: 6px 12px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-
-        #chat-menu-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); justify-content: center; align-items: center; z-index: 30; }
-        .chat-menu-content { background: #fff; width: 220px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
-        .reaction-pick-tray { display: flex; justify-content: space-around; padding: 10px 8px; background: #f7f7f7; border-bottom: 1px solid #eee; }
-        .reaction-pick-item { font-size: 20px; cursor: pointer; transition: transform 0.1s; }
-        .reaction-pick-item:hover { transform: scale(1.2); }
-        .chat-menu-item { padding: 12px; text-align: center; border-bottom: 1px solid #eee; background: none; border: none; font-size: 14px; cursor: pointer; font-weight: bold; color: #333; }
-        .chat-menu-item:last-child { border-bottom: none; }
-        .chat-menu-item:hover { background: #f5f5f5; }
-        .chat-menu-item.delete { color: #d9534f; }
-
-        #reaction-detail-modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); justify-content: center; align-items: center; z-index: 40; }
-        .reaction-detail-content { background: #fff; width: 200px; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .reaction-detail-title { font-size: 12px; font-weight: bold; color: #555; border-bottom: 1px solid #eee; padding-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-        .reaction-detail-list { font-size: 13px; color: #333; list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; }
-        .reaction-detail-list li { padding: 4px 6px; background: #f9f9f9; border-radius: 4px; display: flex; justify-content: space-between; }
-
-        #mention-dropdown { display: none; position: absolute; bottom: 100%; left: 10px; background: #fff; border: 1px solid #ccc; border-radius: 4px; max-height: 130px; overflow-y: auto; z-index: 40; width: 180px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        .mention-item { padding: 8px 12px; font-size: 13px; cursor: pointer; color: #333; border-bottom: 1px solid #eee; }
-        .mention-item:last-child { border-bottom: none; }
-        .mention-item:hover { background: #f0f0f0; }
-        .mention-highlight { color: #0066ff; font-weight: bold; }
-
-        .container.dark-mode { background-color: #18191a !important; color: #e4e6eb !important; }
-        .container.dark-mode .chat-header { background-color: #242526 !important; color: #e4e6eb !important; }
-        .container.dark-mode #user-list-btn { background: #3a3b3c !important; border-color: #4e4f50 !important; color: #e4e6eb !important; }
-        .container.dark-mode .chat-messages { background-color: #18191a !important; }
-        .container.dark-mode .other .bubble { background-color: #242526 !important; color: #e4e6eb !important; }
-        .container.dark-mode .mine .bubble { background-color: #d29922 !important; color: #000 !important; }
-        .container.dark-mode .sender-name { color: #b0b3b8 !important; }
-        .container.dark-mode .time { color: #b0b3b8 !important; }
-        .container.dark-mode .read-status { color: #b0b3b8 !important; }
-        .container.dark-mode .chat-input-area { background-color: #242526 !important; }
-        .container.dark-mode .chat-input-area textarea { background-color: #3a3b3c !important; color: #e4e6eb !important; }
-        .container.dark-mode .chat-input-area textarea::placeholder { color: #b0b3b8; }
-        .container.dark-mode .btn-attach { background: #3a3b3c !important; color: #e4e6eb !important; }
-        .container.dark-mode .send-btn { background-color: #d29922 !important; color: #000 !important; }
-        .container.dark-mode #reply-preview-bar { background: #3a3b3c !important; color: #e4e6eb !important; }
-        .container.dark-mode #reply-preview-bar button { color: #b0b3b8 !important; }
-        .container.dark-mode #typing-notice { color: #b0b3b8 !important; }
-        .container.dark-mode .reply-quote { background: rgba(255,255,255,0.1) !important; color: #e4e6eb !important; border-left-color: #d29922 !important; }
-        .container.dark-mode .reaction-badge { background: #242526 !important; border-color: #3a3b3c !important; color: #e4e6eb !important; }
-        .container.dark-mode .reaction-badge.my-reaction { background: #3a3b3c !important; border-color: #d29922 !important; }
-        .container.dark-mode .chat-menu-content { background: #242526 !important; color: #e4e6eb !important; }
-        .container.dark-mode .reaction-pick-tray { background: #18191a !important; border-bottom: 1px solid #3a3b3c !important; }
-        .container.dark-mode .chat-menu-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
-        .container.dark-mode .chat-menu-item:hover { background: #3a3b3c !important; }
-        .container.dark-mode .reaction-detail-content { background: #242526 !important; color: #e4e6eb !important; }
-        .container.dark-mode .reaction-detail-title { border-bottom: 1px solid #3a3b3c !important; color: #b0b3b8 !important; }
-        .container.dark-mode .reaction-detail-list li { background: #3a3b3c !important; color: #e4e6eb !important; }
-        .container.dark-mode #mention-dropdown { background: #242526 !important; border-color: #3a3b3c !important; }
-        .container.dark-mode .mention-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
-        .container.dark-mode .mention-item:hover { background: #3a3b3c !important; }
-        .container.dark-mode #attach-menu-dropdown { background: #242526 !important; }
-        .container.dark-mode .attach-menu-item { color: #e4e6eb !important; border-bottom: 1px solid #3a3b3c !important; }
-        .container.dark-mode .attach-menu-item:hover { background: #3a3b3c !important; }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <!-- 로그인/회원가입 화면 -->
         <div id="auth-screen">
             <h2>1-1 채팅</h2>
             <div class="input-group">
@@ -252,43 +125,62 @@
             <div id="auth-error" class="error-msg"></div>
         </div>
 
+        <!-- 메인 앱 화면 (친구탭 / 메시지탭 / 실제 채팅방) -->
         <div id="chat-screen">
-            <div class="chat-header">
-                <span id="room-title" onclick="handleTitleClick()" style="cursor: pointer;">1-1 채팅</span>
-                <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
-            </div>
             
-            <div class="chat-messages-wrapper">
-                <div class="chat-messages" id="chat-messages" onscroll="handleScroll()">
+            <!-- 1. 친구 탭 -->
+            <div id="friend-tab" class="tab-content active">
+                <div class="friend-top-box">
+                    <div class="friend-top-info">
+                        <h3 id="my-profile-name">내 계정</h3>
+                        <p id="my-friend-count">등록된 친구수: 0</p>
+                    </div>
+                    <button class="add-friend-btn" onclick="openAddFriendModal()">친구추가</button>
                 </div>
-                <div id="new-message-banner" onclick="scrollToBottom()">
-                    <span id="banner-text">새 메시지가 도착했습니다.</span> ▾
-                </div>
-                <button id="scroll-bottom-btn" onclick="scrollToBottom()">↓</button>
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #444;">친구 목록</div>
+                <ul id="friend-list-ul" class="friend-list">
+                    <!-- 친구 항목들이 세로로 표시됨 -->
+                </ul>
             </div>
 
-            <div class="chat-input-area">
-                <div id="mention-dropdown"></div>
+            <!-- 2. 메시지 탭 (대화방 목록) -->
+            <div id="message-tab" class="tab-content">
+                <div class="chat-header">
+                    <span>메시지</span>
+                    <button id="user-list-btn" onclick="openCreateGroupModal()" style="font-size: 15px; padding: 2px 8px;">＋</button>
+                </div>
+                <ul id="room-list-ul" class="room-list">
+                    <!-- 참여 중인 단톡방 및 1:1 대화방 목록 -->
+                </ul>
+            </div>
 
-                <div id="attach-menu-dropdown">
-                    <button class="attach-menu-item" onclick="triggerFileInput()">🖼️ 사진 전송</button>
-                    <button class="attach-menu-item" onclick="startScreenShare()">💻 화면 공유</button>
+            <!-- 3. 실제 개별 채팅방 화면 (기존 레이아웃 완전 보존) -->
+            <div id="chat-room-view" class="tab-content">
+                <div class="chat-header">
+                    <span id="room-title" style="cursor: pointer;" onclick="switchToTab('message')">← 뒤로가기</span>
+                    <button id="user-list-btn" onclick="toggleUserModal()">온라인유저 확인</button>
+                </div>
+                
+                <div class="chat-messages-wrapper">
+                    <div class="chat-messages" id="chat-messages" onscroll="handleScroll()"></div>
                 </div>
 
-                <div id="reply-preview-bar">
-                    <span id="reply-preview-text"></span>
-                    <button onclick="cancelReply()">✕</button>
-                </div>
-                <div id="typing-notice"></div>
-                <div class="input-row">
-                    <button class="btn-attach" onclick="toggleAttachMenu(event)">+</button>
-                    <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="sendImage(this)">
-                    
-                    <textarea id="message-input" placeholder="메시지를 입력하세요..." oninput="handleMessageInput()" onkeydown="handleKeyDown(event)"></textarea>
-                    <button class="send-btn" onclick="sendMessage()">전송</button>
+                <div class="chat-input-area">
+                    <div class="input-row">
+                        <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="sendImage(this)">
+                        <textarea id="message-input" placeholder="메시지를 입력하세요..." onkeydown="handleKeyDown(event)"></textarea>
+                        <button class="send-btn" onclick="sendMessage()">전송</button>
+                    </div>
                 </div>
             </div>
 
+            <!-- 하단 네비게이션 바 -->
+            <div class="bottom-nav">
+                <button class="nav-tab-btn active" id="btn-tab-friend" onclick="switchToTab('friend')">친구</button>
+                <button class="nav-tab-btn" id="btn-tab-message" onclick="switchToTab('message')">메시지</button>
+            </div>
+
+            <!-- 온라인 유저 모달 -->
             <div id="user-modal" onclick="if(event.target === this) toggleUserModal()">
                 <div class="modal-content">
                     <div class="modal-scroll-area">
@@ -296,42 +188,36 @@
                             <div class="modal-section-title">온라인 유저</div>
                             <ul id="online-users-list" class="modal-user-list"></ul>
                         </div>
-                        <div style="margin-top: 10px;">
-                            <div class="modal-section-title">멤버</div>
-                            <ul id="all-members-list" class="modal-user-list"></ul>
-                        </div>
                     </div>
                     <button class="modal-close-btn" onclick="toggleUserModal()">닫기</button>
                 </div>
             </div>
 
-            <div id="chat-menu-modal" onclick="if(event.target === this) closeChatMenu()">
-                <div class="chat-menu-content" id="chat-menu-box">
-                    <div class="reaction-pick-tray">
-                        <span class="reaction-pick-item" onclick="actionReact('❤️')">❤️</span>
-                        <span class="reaction-pick-item" onclick="actionReact('👍')">👍</span>
-                        <span class="reaction-pick-item" onclick="actionReact('✅')">✅</span>
-                        <span class="reaction-pick-item" onclick="actionReact('😄')">😄</span>
-                        <span class="reaction-pick-item" onclick="actionReact('😢')">😢</span>
-                        <span class="reaction-pick-item" onclick="actionReact('🔥')">🔥</span>
-                    </div>
-                    <button class="chat-menu-item" onclick="actionReply()">답장하기</button>
-                </div>
-            </div>
+        </div>
+    </div>
 
-            <div id="reaction-detail-modal" onclick="if(event.target === this) closeReactionDetail()">
-                <div class="reaction-detail-content">
-                    <div class="reaction-detail-title" id="reaction-detail-title"></div>
-                    <ul id="reaction-detail-list" class="reaction-detail-list"></ul>
-                </div>
+    <!-- 친구추가 검색 모달 -->
+    <div id="add-friend-modal" class="custom-modal">
+        <div class="custom-modal-content">
+            <h3>친구 추가</h3>
+            <input type="text" id="friend-search-input" placeholder="검색할 유저 이름 입력" oninput="searchUsers(this.value)">
+            <ul id="search-result-list" class="friend-list" style="max-height: 150px; overflow-y: auto;"></ul>
+            <div class="modal-btn-row">
+                <button class="modal-btn-cancel" onclick="closeModal('add-friend-modal')">닫기</button>
             </div>
+        </div>
+    </div>
 
-            <div id="screen-viewer-modal">
-                <div class="screen-viewer-header">
-                    <span id="screen-viewer-title" style="font-weight:bold;">화면 공유 시청 중</span>
-                    <button class="viewer-close-btn" onclick="closeScreenViewer()">닫기</button>
-                </div>
-                <video id="screen-video-element" autoplay playsinline></video>
+    <!-- 단체 톡방 생성 모달 -->
+    <div id="create-group-modal" class="custom-modal">
+        <div class="custom-modal-content">
+            <h3>단체 대화방 만들기</h3>
+            <input type="text" id="group-title-input" placeholder="방 이름을 입력하세요">
+            <div style="font-size: 12px; color: #666; margin-top: 4px;">초대할 친구 선택:</div>
+            <div id="group-friend-checkboxes" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
+            <div class="modal-btn-row">
+                <button class="modal-btn-cancel" onclick="closeModal('create-group-modal')">취소</button>
+                <button class="modal-btn-ok" onclick="submitCreateGroup()">확인</button>
             </div>
         </div>
     </div>
@@ -339,116 +225,10 @@
     <script>
         let socket;
         let myUsername = '';
-        let currentReply = null; 
-        let typingTimer;
-        let selectedMessageData = null; 
-        let currentOnlineUserSet = new Set();
-        let lastMarkedMessageId = null; 
-        let titleClickCount = 0;
-        let isDarkMode = false;
-        let cachedMembers = [];
-
-        let localScreenStream = null;
-        let peerConnections = {}; 
-        let isSharingScreen = false;
-        const rtcConfig = {
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        };
-
-        const AVAILABLE_REACTIONS = ['❤️', '👍', '✅', '😄', '😢', '🔥'];
-
-        function toggleAttachMenu(e) {
-            e.stopPropagation();
-            const menu = document.getElementById('attach-menu-dropdown');
-            menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
-        }
-
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('attach-menu-dropdown');
-            if (menu && !menu.contains(e.target) && !e.target.classList.contains('btn-attach')) {
-                menu.style.display = 'none';
-            }
-        });
-
-        function triggerFileInput() {
-            document.getElementById('attach-menu-dropdown').style.display = 'none';
-            document.getElementById('image-input').click();
-        }
-
-        async function startScreenShare() {
-            document.getElementById('attach-menu-dropdown').style.display = 'none';
-            if (isSharingScreen) {
-                alert('이미 화면 공유를 진행 중입니다.');
-                return;
-            }
-
-            try {
-                localScreenStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: 'always' },
-                    audio: false
-                });
-
-                isSharingScreen = true;
-                socket.emit('start_screen_share');
-
-                localScreenStream.getVideoTracks()[0].onended = () => {
-                    stopScreenShare();
-                };
-            } catch (err) {
-                console.error('화면 공유 실패:', err);
-            }
-        }
-
-        function stopScreenShare() {
-            if (!isSharingScreen) return;
-            isSharingScreen = false;
-
-            if (localScreenStream) {
-                localScreenStream.getTracks().forEach(track => track.stop());
-                localScreenStream = null;
-            }
-
-            for (let socketId in peerConnections) {
-                peerConnections[socketId].close();
-            }
-            peerConnections = {};
-
-            socket.emit('stop_screen_share');
-        }
-
-        function viewScreenShare(sharerUsername) {
-            document.getElementById('screen-viewer-title').innerText = `${sharerUsername} 님의 화면 공유`;
-            document.getElementById('screen-viewer-modal').style.display = 'flex';
-            socket.emit('request_join_screen');
-        }
-
-        function closeScreenViewer() {
-            document.getElementById('screen-viewer-modal').style.display = 'none';
-            const video = document.getElementById('screen-video-element');
-            video.srcObject = null;
-        }
-
-        function handleTitleClick() {
-            titleClickCount++;
-            if (titleClickCount >= 10) {
-                titleClickCount = 0;
-                isDarkMode = !isDarkMode;
-                document.querySelector('.container').classList.toggle('dark-mode', isDarkMode);
-            }
-        }
-
-        function formatRelativeTime(timestamp, isOnline) {
-            if (isOnline) return '현재 활동 중';
-            if (!timestamp) return '활동 기록 없음';
-            const diffSeconds = Math.floor((Date.now() - timestamp) / 1000);
-            if (diffSeconds < 60) return '방금전 활동';
-            const diffMinutes = Math.floor(diffSeconds / 60);
-            if (diffMinutes < 60) return `${diffMinutes}분 전 활동`;
-            const diffHours = Math.floor(diffMinutes / 60);
-            if (diffHours < 24) return `${diffHours}시간 전 활동`;
-            const diffDays = Math.floor(diffHours / 24);
-            return `${diffDays}일 전 활동`;
-        }
+        let myFriends = [];
+        let myRooms = ['general'];
+        let currentRoom = 'general';
+        let unreadCounts = {}; // 방별 안읽은 메시지 수 관리
 
         async function signup() {
             const username = document.getElementById('username').value.trim();
@@ -481,9 +261,14 @@
             const data = await res.json();
             if (data.success) {
                 myUsername = username;
+                myFriends = data.friends || [];
+                myRooms = data.rooms || ['general'];
+
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('chat-screen').style.display = 'flex';
+                
                 initSocket();
+                renderFriendTab();
             } else {
                 document.getElementById('auth-error').innerText = data.message;
             }
@@ -494,142 +279,224 @@
                 query: { username: myUsername }
             });
 
+            socket.on('init_user_data', (data) => {
+                myFriends = data.friends || [];
+                myRooms = data.rooms || ['general'];
+                renderFriendTab();
+                renderRoomList();
+            });
+
             socket.on('load_history', (history) => {
+                // 특정 방 메시지만 필터링하여 표시할 수 있도록 구현
                 const chatMessages = document.getElementById('chat-messages');
                 chatMessages.innerHTML = '';
-                history.forEach((data, index) => {
-                    const isLast = (index === history.length - 1);
-                    appendMessage(data, false, isLast);
+                history.forEach((data) => {
+                    if ((data.room || 'general') === currentRoom) {
+                        appendMessage(data, false);
+                    }
                 });
                 scrollToBottom();
             });
 
             socket.on('receive_message', (data) => {
-                const chatMessages = document.getElementById('chat-messages');
-                const lastMsg = chatMessages.lastElementChild;
-                if (lastMsg) {
-                    const oldReadEl = lastMsg.querySelector('.read-status');
-                    if (oldReadEl) oldReadEl.remove();
-                }
-                appendMessage(data, true, true);
-            });
-
-            socket.on('message_read_updated', ({ messageId, readBy }) => {
-                const msgEl = document.getElementById(`msg-${messageId}`);
-                if (msgEl) updateReadStatusElement(msgEl, readBy);
-            });
-
-            socket.on('message_deleted', (messageId) => {
-                const msgEl = document.getElementById(`msg-${messageId}`);
-                if (msgEl) msgEl.remove();
-            });
-
-            socket.on('reaction_updated', ({ messageId, reactions }) => {
-                const msgEl = document.getElementById(`msg-${messageId}`);
-                if (msgEl) {
-                    const container = msgEl.querySelector('.reaction-container');
-                    if (container) renderReactions(container, reactions, getMessageData(msgEl));
+                const msgRoom = data.room || 'general';
+                if (msgRoom === currentRoom) {
+                    appendMessage(data, true);
+                } else {
+                    // 현재 보고 있는 방이 아니라면 안읽은 카운트 증가
+                    unreadCounts[msgRoom] = (unreadCounts[msgRoom] || 0) + 1;
+                    renderRoomList();
                 }
             });
 
-            socket.on('update_user_list', ({ onlineList, allMembers }) => {
-                currentOnlineUserSet = new Set(onlineList);
-                cachedMembers = allMembers.map(m => m.username);
-
+            socket.on('update_user_list', ({ onlineList }) => {
                 const onlineUl = document.getElementById('online-users-list');
                 onlineUl.innerHTML = '';
                 onlineList.forEach(username => {
                     const li = document.createElement('li');
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'user-name-span online-dot';
-                    nameSpan.innerText = username;
-                    li.appendChild(nameSpan);
+                    li.innerText = username;
                     onlineUl.appendChild(li);
                 });
-
-                const membersUl = document.getElementById('all-members-list');
-                membersUl.innerHTML = '';
-                allMembers.forEach(member => {
-                    const li = document.createElement('li');
-                    const isOnline = currentOnlineUserSet.has(member.username);
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'user-name-span';
-                    nameSpan.classList.add(isOnline ? 'online-dot' : 'offline-dot');
-                    nameSpan.innerText = member.username;
-
-                    const timeSpan = document.createElement('span');
-                    timeSpan.className = 'user-time-span';
-                    timeSpan.innerText = formatRelativeTime(member.lastActive, isOnline);
-
-                    li.appendChild(nameSpan);
-                    li.appendChild(timeSpan);
-                    membersUl.appendChild(li);
-                });
             });
-
-            socket.on('update_typing', (users) => {
-                const otherTyping = users.filter(u => u !== myUsername);
-                const noticeEl = document.getElementById('typing-notice');
-                if (otherTyping.length === 0) noticeEl.innerText = '';
-                else if (otherTyping.length === 1) noticeEl.innerText = `${otherTyping[0]}님이 입력 중입니다...`;
-                else noticeEl.innerText = `${otherTyping[0]}님 외 ${otherTyping.length - 1}명이 입력 중입니다...`;
-            });
-
-            socket.on('screen_viewer_joined', async ({ viewerSocketId }) => {
-                if (!isSharingScreen || !localScreenStream) return;
-                const pc = new RTCPeerConnection(rtcConfig);
-                peerConnections[viewerSocketId] = pc;
-                localScreenStream.getTracks().forEach(track => pc.addTrack(track, localScreenStream));
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        socket.emit('screen_ice_candidate', { targetSocketId: viewerSocketId, candidate: event.candidate });
-                    }
-                };
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                socket.emit('screen_offer', { viewerSocketId, offer });
-            });
-
-            socket.on('screen_offer_received', async ({ sharerSocketId, offer }) => {
-                const pc = new RTCPeerConnection(rtcConfig);
-                peerConnections[sharerSocketId] = pc;
-                pc.ontrack = (event) => {
-                    const video = document.getElementById('screen-video-element');
-                    if (event.streams && event.streams[0]) video.srcObject = event.streams[0];
-                };
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        socket.emit('screen_ice_candidate', { targetSocketId: sharerSocketId, candidate: event.candidate });
-                    }
-                };
-                await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit('screen_answer', { sharerSocketId, answer });
-            });
-
-            socket.on('screen_answer_received', async ({ viewerSocketId, answer }) => {
-                const pc = peerConnections[viewerSocketId];
-                if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            });
-
-            socket.on('screen_ice_candidate_received', async ({ senderSocketId, candidate }) => {
-                const pc = peerConnections[senderSocketId];
-                if (pc) {
-                    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
-                }
-            });
-
-            socket.on('screen_share_closed', () => closeScreenViewer());
         }
 
-        function getMessageData(msgEl) {
-            return {
-                _id: msgEl.dataset.id,
-                username: msgEl.dataset.username,
-                message: msgEl.dataset.message,
-                image: msgEl.dataset.image
-            };
+        // 하단 탭 전환 함수
+        function switchToTab(tabId) {
+            document.getElementById('friend-tab').classList.remove('active');
+            document.getElementById('message-tab').classList.remove('active');
+            document.getElementById('chat-room-view').classList.remove('active');
+
+            document.getElementById('btn-tab-friend').classList.remove('active');
+            document.getElementById('btn-tab-message').classList.remove('active');
+
+            if (tabId === 'friend') {
+                document.getElementById('friend-tab').classList.add('active');
+                document.getElementById('btn-tab-friend').classList.add('active');
+                renderFriendTab();
+            } else if (tabId === 'message') {
+                document.getElementById('message-tab').classList.add('active');
+                document.getElementById('btn-tab-message').classList.add('active');
+                renderRoomList();
+            } else if (tabId === 'room') {
+                document.getElementById('chat-room-view').classList.add('active');
+            }
+        }
+
+        // 친구 탭 화면 렌더링
+        function renderFriendTab() {
+            document.getElementById('my-profile-name').innerText = myUsername;
+            document.getElementById('my-friend-count').innerText = `등록된 친구수: ${myFriends.length}`;
+
+            const ul = document.getElementById('friend-list-ul');
+            ul.innerHTML = '';
+            myFriends.forEach(friend => {
+                const li = document.createElement('li');
+                li.className = 'friend-item';
+                li.innerHTML = `
+                    <span class="friend-name">${friend}</span>
+                    <button class="chat-go-btn" onclick="openDMRoom('${friend}')">메시지 보내기</button>
+                `;
+                ul.appendChild(li);
+            });
+        }
+
+        // 메시지 탭 방 목록 렌더링
+        function renderRoomList() {
+            const ul = document.getElementById('room-list-ul');
+            ul.innerHTML = '';
+
+            // 기본 전체 방 'general' 및 내 rooms 목록 표시
+            const displayRooms = ['general', ...myRooms.filter(r => r !== 'general')];
+
+            displayRooms.forEach(room => {
+                let displayName = room;
+                if (room === 'general') displayName = '1-1 채팅 (전체방)';
+                else if (room.startsWith('dm_')) {
+                    // 1:1 방인 경우 상대방 이름 추출
+                    const parts = room.replace('dm_', '').split('_');
+                    const partner = parts[0] === myUsername ? parts[1] : parts[0];
+                    displayName = partner; // 상대방 이름으로 방 제목 표시
+                }
+
+                const unread = unreadCounts[room] || 0;
+                const li = document.createElement('li');
+                li.className = 'room-item';
+                li.onclick = () => enterRoom(room, displayName);
+                li.innerHTML = `
+                    <div class="room-item-left">
+                        <span class="room-name">${displayName}</span>
+                        <span class="room-last-msg">클릭하여 대화하기</span>
+                    </div>
+                    ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ''}
+                `;
+                ul.appendChild(li);
+            });
+        }
+
+        // 친구와 1:1 대화방 열기
+        function openDMRoom(friendName) {
+            socket.emit('get_or_create_dm', friendName, (res) => {
+                if (res.success) {
+                    enterRoom(res.roomName, friendName);
+                }
+            });
+        }
+
+        // 특정 방으로 입장
+        function enterRoom(roomName, titleName) {
+            currentRoom = roomName;
+            unreadCounts[roomName] = 0; // 입장 시 안읽은 개수 초기화
+            document.getElementById('room-title').innerText = titleName;
+            
+            socket.emit('join_room', roomName);
+            switchToTab('room');
+
+            // 해당 방 메시지 로드 요청 또는 초기화
+            document.getElementById('chat-messages').innerHTML = '';
+            // 서버에 톡 내역 요청 로직 추가 가능
+        }
+
+        // 친구 추가 모달 관련
+        function openAddFriendModal() {
+            document.getElementById('friend-search-input').value = '';
+            document.getElementById('search-result-list').innerHTML = '';
+            document.getElementById('add-friend-modal').style.display = 'flex';
+        }
+
+        function searchUsers(keyword) {
+            if (!keyword.trim()) {
+                document.getElementById('search-result-list').innerHTML = '';
+                return;
+            }
+            socket.emit('search_users', keyword, (users) => {
+                const list = document.getElementById('search-result-list');
+                list.innerHTML = '';
+                users.forEach(u => {
+                    const li = document.createElement('li');
+                    li.className = 'friend-item';
+                    li.innerHTML = `
+                        <span>${u}</span>
+                        <button class="chat-go-btn" onclick="addFriendAction('${u}')">친구추가</button>
+                    `;
+                    list.appendChild(li);
+                });
+            });
+        }
+
+        function addFriendAction(friendName) {
+            socket.emit('add_friend', friendName, (res) => {
+                if (res.success) {
+                    myFriends = res.friends;
+                    alert(`${friendName} 님과 친구가 되었습니다!`);
+                    renderFriendTab();
+                    closeModal('add-friend-modal');
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        // 단톡방 생성 모달 (+) 버튼
+        function openCreateGroupModal() {
+            const container = document.getElementById('group-friend-checkboxes');
+            container.innerHTML = '';
+            myFriends.forEach(f => {
+                const label = document.createElement('label');
+                label.style.fontSize = '13px';
+                label.innerHTML = `<input type="checkbox" value="${f}" style="margin-right: 6px;">${f}`;
+                container.appendChild(label);
+            });
+            document.getElementById('group-title-input').value = '';
+            document.getElementById('create-group-modal').style.display = 'flex';
+        }
+
+        function submitCreateGroup() {
+            const title = document.getElementById('group-title-input').value.trim();
+            const checkboxes = document.querySelectorAll('#group-friend-checkboxes input[type="checkbox"]:checked');
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+
+            if (!title) {
+                alert('방 이름을 입력해주세요.');
+                return;
+            }
+            if (selected.length === 0) {
+                alert('함께 대화할 친구를 1명 이상 선택해주세요.');
+                return;
+            }
+
+            socket.emit('create_group_room', { roomTitle: title, selectedFriends: selected }, (res) => {
+                if (res.success) {
+                    myRooms.push(res.roomId);
+                    closeModal('create-group-modal');
+                    switchToTab('message');
+                    renderRoomList();
+                    enterRoom(res.roomId, res.roomTitle);
+                }
+            });
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
         }
 
         function toggleUserModal() {
@@ -637,71 +504,7 @@
             modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
         }
 
-        function handleMessageInput() {
-            handleTyping();
-            checkMentionTrigger();
-        }
-
-        function handleTyping() {
-            socket.emit('typing', true);
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => socket.emit('typing', false), 1500);
-        }
-
-        function checkMentionTrigger() {
-            const input = document.getElementById('message-input');
-            const val = input.value;
-            const pos = input.selectionStart;
-            const textBeforeCursor = val.substring(0, pos);
-            const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-            const dropdown = document.getElementById('mention-dropdown');
-            
-            if (lastAtIndex !== -1) {
-                const query = textBeforeCursor.substring(lastAtIndex + 1);
-                if (!/\s/.test(query)) {
-                    showMentionDropdown(query, lastAtIndex);
-                    return;
-                }
-            }
-            dropdown.style.display = 'none';
-        }
-
-        function showMentionDropdown(query, atIndex) {
-            const dropdown = document.getElementById('mention-dropdown');
-            dropdown.innerHTML = '';
-            const filtered = cachedMembers.filter(m => m.toLowerCase().includes(query.toLowerCase()));
-            if (filtered.length === 0) {
-                dropdown.style.display = 'none';
-                return;
-            }
-            filtered.forEach(name => {
-                const item = document.createElement('div');
-                item.className = 'mention-item';
-                item.innerText = '@' + name;
-                item.onclick = () => insertMention(name, atIndex);
-                dropdown.appendChild(item);
-            });
-            dropdown.style.display = 'block';
-        }
-
-        function insertMention(username, atIndex) {
-            const input = document.getElementById('message-input');
-            const val = input.value;
-            const pos = input.selectionStart;
-            const before = val.substring(0, atIndex);
-            const after = val.substring(pos);
-            input.value = before + '@' + username + ' ' + after;
-            input.focus();
-            const newPos = atIndex + username.length + 2;
-            input.setSelectionRange(newPos, newPos);
-            document.getElementById('mention-dropdown').style.display = 'none';
-        }
-
         function handleKeyDown(event) {
-            const dropdown = document.getElementById('mention-dropdown');
-            if (dropdown.style.display === 'flex' || dropdown.style.display === 'block') {
-                if (event.key === 'Escape') dropdown.style.display = 'none';
-            }
             if (event.isComposing || event.keyCode === 229) return;
             if (event.key === 'Enter') {
                 if (event.shiftKey) return;
@@ -713,39 +516,14 @@
         function scrollToBottom() {
             const chatMessages = document.getElementById('chat-messages');
             chatMessages.scrollTop = chatMessages.scrollHeight;
-            document.getElementById('new-message-banner').style.display = 'none';
-            document.getElementById('scroll-bottom-btn').style.display = 'none';
-            checkAndMarkLastMessageRead();
         }
 
-        function handleScroll() {
-            const chatMessages = document.getElementById('chat-messages');
-            const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
-            if (distanceToBottom > 30) {
-                document.getElementById('scroll-bottom-btn').style.display = 'flex';
-            } else {
-                document.getElementById('new-message-banner').style.display = 'none';
-                document.getElementById('scroll-bottom-btn').style.display = 'none';
-                checkAndMarkLastMessageRead();
-            }
-        }
-
-        function checkAndMarkLastMessageRead() {
-            const chatMessages = document.getElementById('chat-messages');
-            const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
-            if (distanceToBottom <= 30) {
-                const lastMsg = chatMessages.lastElementChild;
-                if (lastMsg && lastMsg.dataset.id && lastMarkedMessageId !== lastMsg.dataset.id) {
-                    lastMarkedMessageId = lastMsg.dataset.id;
-                    socket.emit('mark_read', lastMsg.dataset.id);
-                }
-            }
-        }
+        function handleScroll() {}
 
         function sendMessage() {
             const input = document.getElementById('message-input');
             const message = input.value.trim();
-            if (!message && !currentReply) return;
+            if (!message) return;
 
             const now = new Date();
             const timeString = now.toLocaleTimeString('ko-KR', {
@@ -753,16 +531,13 @@
             });
 
             socket.emit('send_message', {
+                room: currentRoom,
                 username: myUsername,
                 message: message,
-                time: timeString,
-                replyTo: currentReply
+                time: timeString
             });
 
             input.value = '';
-            document.getElementById('mention-dropdown').style.display = 'none';
-            socket.emit('typing', false);
-            cancelReply();
             input.focus();
         }
 
@@ -777,216 +552,24 @@
                     });
 
                     socket.emit('send_message', {
+                        room: currentRoom,
                         username: myUsername,
                         message: '',
                         image: e.target.result,
-                        time: timeString,
-                        replyTo: currentReply
+                        time: timeString
                     });
-                    cancelReply();
                     input.value = ''; 
                 };
                 reader.readAsDataURL(file);
             }
         }
 
-        function setReply(username, text, messageId) {
-            currentReply = { username, text: text || '[이미지]', targetId: messageId };
-            document.getElementById('reply-preview-text').innerText = `${username}: ${currentReply.text}`;
-            document.getElementById('reply-preview-bar').style.display = 'flex';
-            document.getElementById('message-input').focus();
-        }
-
-        function cancelReply() {
-            currentReply = null;
-            document.getElementById('reply-preview-bar').style.display = 'none';
-        }
-
-        function jumpToOriginalMessage(targetId, targetUsername, targetText) {
-            let targetEl = null;
-            if (targetId) targetEl = document.getElementById(`msg-${targetId}`);
-            if (!targetEl) {
-                const allBoxes = document.querySelectorAll('.message-box');
-                for (let box of allBoxes) {
-                    if (box.dataset.username === targetUsername && 
-                       (box.dataset.message === targetText || (targetText === '[이미지]' && box.dataset.image))) {
-                        targetEl = box;
-                        break;
-                    }
-                }
-            }
-
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                targetEl.classList.remove('highlight-target');
-                void targetEl.offsetWidth;
-                targetEl.classList.add('highlight-target');
-            } else {
-                alert('원본 메시지를 찾을 수 없거나 이미 삭제되었습니다.');
-            }
-        }
-
-        function openChatMenu(data) {
-            selectedMessageData = data;
-            const menuModal = document.getElementById('chat-menu-modal');
-            const menuBox = document.getElementById('chat-menu-box');
-            
-            let html = `
-                <div class="reaction-pick-tray">
-                    <span class="reaction-pick-item" onclick="actionReact('❤️')">❤️</span>
-                    <span class="reaction-pick-item" onclick="actionReact('👍')">👍</span>
-                    <span class="reaction-pick-item" onclick="actionReact('✅')">✅</span>
-                    <span class="reaction-pick-item" onclick="actionReact('😄')">😄</span>
-                    <span class="reaction-pick-item" onclick="actionReact('😢')">😢</span>
-                    <span class="reaction-pick-item" onclick="actionReact('🔥')">🔥</span>
-                </div>
-                <button class="chat-menu-item" onclick="actionReply()">답장하기</button>
-            `;
-
-            if (data.username === myUsername && data._id) {
-                html += `<button class="chat-menu-item delete" onclick="actionDelete()">삭제하기</button>`;
-            }
-
-            menuBox.innerHTML = html;
-            menuModal.style.display = 'flex';
-        }
-
-        function closeChatMenu() {
-            document.getElementById('chat-menu-modal').style.display = 'none';
-        }
-
-        function actionReply() {
-            closeChatMenu();
-            if (selectedMessageData) {
-                setReply(selectedMessageData.username, selectedMessageData.message, selectedMessageData._id);
-            }
-        }
-
-        function actionDelete() {
-            closeChatMenu();
-            if (selectedMessageData && selectedMessageData._id) {
-                socket.emit('delete_message', selectedMessageData._id);
-            }
-        }
-
-        function actionReact(emoji) {
-            closeChatMenu();
-            if (selectedMessageData && selectedMessageData._id) {
-                socket.emit('toggle_reaction', { messageId: selectedMessageData._id, emoji });
-            }
-        }
-
-        function handleReactionBadgeClick(messageId, emoji, reactions) {
-            socket.emit('toggle_reaction', { messageId, emoji });
-        }
-
-        function showReactionDetail(emoji, users) {
-            const modal = document.getElementById('reaction-detail-modal');
-            const titleEl = document.getElementById('reaction-detail-title');
-            const listEl = document.getElementById('reaction-detail-list');
-
-            titleEl.innerHTML = `<span>${emoji}</span> 반응한 사람 (${users.length})`;
-            listEl.innerHTML = '';
-            users.forEach(user => {
-                const li = document.createElement('li');
-                li.innerText = user;
-                listEl.appendChild(li);
-            });
-
-            modal.style.display = 'flex';
-        }
-
-        function closeReactionDetail() {
-            document.getElementById('reaction-detail-modal').style.display = 'none';
-        }
-
-        function updateReadStatusElement(boxEl, readBy) {
-            let readEl = boxEl.querySelector('.read-status');
-            if (!readEl) {
-                readEl = document.createElement('div');
-                readEl.className = 'read-status';
-                boxEl.appendChild(readEl);
-            }
-
-            const othersWhoRead = (readBy || []).filter(u => u !== myUsername);
-            if (othersWhoRead.length === 0) readEl.innerText = '';
-            else if (othersWhoRead.length === 1) readEl.innerText = `${othersWhoRead[0]} 읽음`;
-            else if (othersWhoRead.length === 2) readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 읽음`;
-            else readEl.innerText = `${othersWhoRead[0]}, ${othersWhoRead[1]} 외 ${othersWhoRead.length - 2}명 읽음`;
-        }
-
-        function formatMessageText(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            let escaped = div.innerHTML;
-            escaped = escaped.replace(/@([^\s]+)/g, (match) => `<span class="mention-highlight">${match}</span>`);
-            return escaped;
-        }
-
-        function renderReactions(containerEl, reactions, messageData) {
-            containerEl.innerHTML = '';
-            if (!reactions) return;
-
-            for (const [emoji, users] of Object.entries(reactions)) {
-                if (!users || users.length === 0) continue;
-
-                const badge = document.createElement('div');
-                badge.className = 'reaction-badge';
-                if (users.includes(myUsername)) badge.classList.add('my-reaction');
-
-                badge.innerHTML = `<span>${emoji}</span><span>${users.length}</span>`;
-                badge.onclick = (e) => {
-                    e.stopPropagation();
-                    handleReactionBadgeClick(messageData._id, emoji, reactions);
-                };
-                badge.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    showReactionDetail(emoji, users);
-                };
-
-                let pressTimer;
-                badge.ontouchstart = (e) => {
-                    pressTimer = setTimeout(() => {
-                        e.preventDefault();
-                        showReactionDetail(emoji, users);
-                    }, 600);
-                };
-                badge.ontouchend = () => clearTimeout(pressTimer);
-
-                containerEl.appendChild(badge);
-            }
-        }
-
-        function appendMessage(data, isNewMessage, isLastMessage = false) {
+        function appendMessage(data, isNewMessage) {
             const chatMessages = document.getElementById('chat-messages');
-            const distanceToBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
-            const isScrolledUp = distanceToBottom > 30;
             const isMine = data.username === myUsername;
 
             const box = document.createElement('div');
             box.className = `message-box ${isMine ? 'mine' : 'other'}`;
-            if (data._id) {
-                box.id = `msg-${data._id}`;
-                box.dataset.id = data._id;
-            }
-            box.dataset.username = data.username;
-            box.dataset.message = data.message || '';
-            box.dataset.image = data.image || '';
-
-            box.oncontextmenu = (e) => {
-                e.preventDefault();
-                openChatMenu(data);
-            };
-
-            let pressTimer;
-            box.ontouchstart = (e) => {
-                if (e.target.closest('.reaction-badge') || e.target.closest('.screen-share-btn')) return;
-                pressTimer = setTimeout(() => openChatMenu(data), 600);
-            };
-            box.ontouchend = () => clearTimeout(pressTimer);
-            box.ontouchmove = () => clearTimeout(pressTimer);
 
             if (!isMine) {
                 const nameDiv = document.createElement('div');
@@ -995,38 +578,10 @@
                 box.appendChild(nameDiv);
             }
 
-            if (data.replyTo) {
-                const quoteDiv = document.createElement('div');
-                quoteDiv.className = 'reply-quote';
-                quoteDiv.innerText = `↳ ${data.replyTo.username}: ${data.replyTo.text}`;
-                quoteDiv.onclick = (e) => {
-                    e.stopPropagation();
-                    jumpToOriginalMessage(data.replyTo.targetId, data.replyTo.username, data.replyTo.text);
-                };
-                box.appendChild(quoteDiv);
-            }
-
             if (data.message) {
                 const bubble = document.createElement('div');
                 bubble.className = 'bubble';
-                bubble.innerHTML = formatMessageText(data.message);
-
-                if (data.isScreenShareNotice && data.screenSharer) {
-                    const btnContainer = document.createElement('div');
-                    if (data.screenSharer === myUsername) {
-                        btnContainer.innerHTML = `<button class="screen-share-btn stop" onclick="stopScreenShare()">🛑 화면 공유 중지</button>`;
-                    } else {
-                        btnContainer.innerHTML = `<button class="screen-share-btn" onclick="viewScreenShare('${data.screenSharer}')">📺 화면 공유 보기</button>`;
-                    }
-                    bubble.appendChild(btnContainer);
-                }
-
-                if (data.isGameLink) {
-                    const btnContainer = document.createElement('div');
-                    btnContainer.innerHTML = `<button class="screen-share-btn game-btn" onclick="window.open('/game?username=' + encodeURIComponent(myUsername), '_blank')">🎮 게임으로 이동하기</button>`;
-                    bubble.appendChild(btnContainer);
-                }
-
+                bubble.innerText = data.message;
                 box.appendChild(bubble);
             }
 
@@ -1037,31 +592,13 @@
                 box.appendChild(img);
             }
 
-            const reactionContainer = document.createElement('div');
-            reactionContainer.className = 'reaction-container';
-            renderReactions(reactionContainer, data.reactions, data);
-            box.appendChild(reactionContainer);
-
             const time = document.createElement('span');
             time.className = 'time';
-            time.innerText = data.time || new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: true });
+            time.innerText = data.time || '';
             box.appendChild(time);
 
             chatMessages.appendChild(box);
-
-            if (isLastMessage) updateReadStatusElement(box, data.readBy);
-
-            if (!isNewMessage || !isScrolledUp) {
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                document.getElementById('new-message-banner').style.display = 'none';
-                document.getElementById('scroll-bottom-btn').style.display = 'none';
-            } else {
-                const bannerText = document.getElementById('banner-text');
-                const contentSummary = data.message ? data.message : '[사진]';
-                bannerText.innerText = `${data.username}: ${contentSummary}`;
-                document.getElementById('new-message-banner').style.display = 'flex';
-                document.getElementById('scroll-bottom-btn').style.display = 'flex';
-            }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     </script>
 </body>
